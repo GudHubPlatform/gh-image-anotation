@@ -71,6 +71,25 @@ class PaintEditor {
         }
     }
 
+    lockCanvasInteractions() {
+        this.canvas.selection = false;
+        this.canvas.forEachObject(obj => {
+            obj.selectable = true;
+            obj.evented = false;
+        });
+        this.canvas.discardActiveObject();
+        this.canvas.requestRenderAll();
+    }
+
+    unlockCanvasInteractions() {
+        this.canvas.selection = true;
+        this.canvas.forEachObject(obj => {
+            obj.selectable = true;
+            obj.evented = true;
+        });
+        this.canvas.requestRenderAll();
+    }
+
     addObjectSilently(obj) {
         this.canvas.off('object:added', this.saveStateBound);
         this.canvas.add(obj);
@@ -89,16 +108,18 @@ class PaintEditor {
         this.disableDrawingMode();
         this.isTextInsertMode = true;
         this.canvas.defaultCursor = 'crosshair';
+        this.lockCanvasInteractions();
     }
 
     addLink() {
         this.disableDrawingMode();
+        this.lockCanvasInteractions();
 
         const url = prompt("Enter URL:", "https://example.com");
-        if (!url) return;
+        if (!url) return this.unlockCanvasInteractions();
 
         const linkText = prompt("Enter link text:", "Click here");
-        if (!linkText) return;
+        if (!linkText) return this.unlockCanvasInteractions();
 
         const textbox = new fabric.Textbox(linkText, {
             left: 150,
@@ -136,10 +157,13 @@ class PaintEditor {
         this.canvas.add(textbox).setActiveObject(textbox);
         textbox.enterEditing();
         textbox.hiddenTextarea && textbox.hiddenTextarea.focus();
+
+        this.unlockCanvasInteractions();
     }
 
     addArrow() {
         this.enableArrowDrawing();
+        this.lockCanvasInteractions();
     }
 
     handlePaste(e) {
@@ -270,6 +294,8 @@ class PaintEditor {
 
             this.isTextInsertMode = false;
             this.canvas.defaultCursor = 'default';
+            
+            this.unlockCanvasInteractions();
         }
 
         if (e.target && e.target.type === 'textbox' && e.target.customUrl) {
@@ -320,6 +346,7 @@ class PaintEditor {
         this.canvas.defaultCursor = 'default';
 
         this.canvas.selection = true;
+        this.unlockCanvasInteractions();
     }
 
     uploadImage(event) {
