@@ -29,6 +29,12 @@ class PaintEditor {
                 }
 
                 canvas.remove(target);
+
+                const editorInstance = window.editor;
+                if (editorInstance?.activeLinkTextbox === target) {
+                    editorInstance.hideLinkToolbar();
+                }
+
                 canvas.requestRenderAll();
             },
             render: function (ctx, left, top, styleOverride, fabricObject) {
@@ -213,7 +219,9 @@ class PaintEditor {
 
         textbox.on('mouseup', () => {
             setTimeout(() => {
-                this.showLinkToolbar(textbox);
+                if (this.canvas.getObjects().includes(textbox)) {
+                    this.showLinkToolbar(textbox);
+                }
             }, 50);
         });
 
@@ -298,6 +306,7 @@ class PaintEditor {
                 editable: true,
                 cursorColor: this.currentColor,
                 fill: this.currentColor,
+                backgroundColor: 'white',
                 padding: 4,
                 objectCaching: false,
                 originX: 'center',
