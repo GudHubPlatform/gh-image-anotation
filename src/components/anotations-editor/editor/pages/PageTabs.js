@@ -6,7 +6,7 @@ export function createPageTabsContainer() {
 };
 
 export function renderPageTabs(editor) {
-  const container = document.getElementById('pageTabs');
+  const container = document.querySelector('#pageTabs');
   container.innerHTML = '';
 
 	editor.pages.forEach((_, i) => {

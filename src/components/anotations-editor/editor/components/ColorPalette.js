@@ -10,7 +10,7 @@ export function setupColorPalette(editor) {
 		});
 	});
 
-	document.getElementById('customColor')?.addEventListener('input', (e) => {
+	document.querySelector('#customColor')?.addEventListener('input', (e) => {
 		editor.currentColor = e.target.value;
 		if (editor.canvas?.isDrawingMode) {
 			editor.canvas.freeDrawingBrush.color = editor.currentColor;

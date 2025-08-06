@@ -10,14 +10,16 @@ import { initPages, addPage, switchToPage, renderPageTabs } from './pages/PageMa
 import { saveState } from './state/history.js';
 import { undo, redo } from './state/undoRedo.js';
 import { clearCanvas, saveImage } from './utils/helpers.js';
-import { setupToolbar } from '../components/Toolbar.js';
-import { setupColorPalette } from '../components/ColorPalette.js';
-import { setupLinkToolbar } from '../components/LinkToolbar.js';
-import { setupPageTabs } from '../components/PageTabs.js';
+import { setupToolbar } from './components/Toolbar.js';
+import { setupColorPalette } from './components/ColorPalette.js';
+import { setupLinkToolbar } from './components/LinkToolbar.js';
+import { setupPageTabs } from './components/PageTabs.js';
 
 export default class PaintEditor {
-    constructor() {
+    constructor(root) {
         applyFabricOverrides();
+
+        this.root = root;
 
         this.canvas = null;
         this.pages = [];
@@ -44,7 +46,8 @@ export default class PaintEditor {
     }
 
     initUI() {
-        setupToolbar(this);
+        console.log("this:", this);
+        setupToolbar(this, this.root); 
         setupColorPalette(this);
         setupLinkToolbar(this);
         setupPageTabs(this);

@@ -1,5 +1,5 @@
 export function setupPageTabs(editor) {
-    const container = document.getElementById('pageTabs');
+    const container = document.querySelector('#pageTabs');
     if (!container) return;
 
     container.addEventListener('click', (e) => {
@@ -21,7 +21,7 @@ export function setupPageTabs(editor) {
 };
 
 export function renderPageTabs(editor) {
-    const container = document.getElementById('pageTabs');
+    const container = document.querySelector('#pageTabs');
     if (!container) return;
 
     container.innerHTML = '';

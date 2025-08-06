@@ -1,4 +1,4 @@
-import { renderSlides, renderPreview } from './SlidePreview.js';
+import { renderSlides, renderPreview } from './ViewerPreview.js';
 
 let slides = [];
 let selectedSlide = null;

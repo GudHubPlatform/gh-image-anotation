@@ -3,7 +3,7 @@ export function initPages(editor) {
 };
 
 export function addPage(editor) {
-    const canvasWrapper = document.getElementById('canvasWrapper');
+    const canvasWrapper = document.querySelector('#canvasWrapper');
 
     const pageWrapper = document.createElement('div');
     pageWrapper.className = 'canvas-page';
@@ -53,7 +53,7 @@ export function switchToPage(editor, index) {
 };
 
 export function renderPageTabs(editor) {
-    const container = document.getElementById('pageTabs');
+    const container = document.querySelector('#pageTabs');
     container.innerHTML = '';
 
     editor.pages.forEach((_, i) => {

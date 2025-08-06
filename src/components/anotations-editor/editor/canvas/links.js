@@ -52,7 +52,7 @@ export function setupLinkTools(editor) {
     };
 
     editor.showLinkToolbar = (textbox) => {
-        const toolbar = document.getElementById('linkToolbar');
+        const toolbar = document.querySelector('#linkToolbar');
         const canvasRect = editor.canvas.upperCanvasEl.getBoundingClientRect();
         const zoom = editor.canvas.getZoom();
 
@@ -67,7 +67,7 @@ export function setupLinkTools(editor) {
     };
 
     editor.hideLinkToolbar = () => {
-        document.getElementById('linkToolbar').style.display = 'none';
+        document.querySelector('#linkToolbar').style.display = 'none';
         editor.activeLinkTextbox = null;
     };
 
