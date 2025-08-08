@@ -4,21 +4,13 @@
     <meta charset="UTF-8" />
     <title>Annotation Editor</title>
 
+    <link rel="stylesheet" href="./styles.css">
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"></script>
 </head>
 <body>
-    <p>Annotation Editor</p>
+    <gh-image-annotation></gh-image-annotation>
 
-    <gh-image-anotation></gh-image-anotation>
-
-    <script type="module" src="./dist/imageAnotation.js"></script>
-    <script type="module" src="./dist/anotationsEditor.js"></script>
-    <script type="module" src="./dist/anotationsViewer.js"></script>
-
-    <script type="module">
-        import('./dist/anotationsEditor.js').then(() => {
-            console.log(customElements.get('gh-image-anotation')); // now works
-        });
-    </script>
+    <script type="module" src="./dist/bundle.js"></script>
 </body>
 </html>
