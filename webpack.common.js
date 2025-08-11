@@ -6,7 +6,7 @@ export default {
     entry: './index.js',
     output: {
         path: path.resolve('dist'),
-        filename: 'bundle.js',
+        filename: 'main.js',
         library: { type: 'module' },
         clean: true
     },

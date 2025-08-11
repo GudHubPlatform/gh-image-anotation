@@ -29,10 +29,10 @@ export function applyFabricOverrides() {
 
             canvas.remove(target);
 
-            const editorInstance = window.editor;
-            if (editorInstance?.activeLinkTextbox === target) {
-                editorInstance.hideLinkToolbar();
-            }
+            // const editorInstance = window.editor;
+            // if (editorInstance?.activeLinkTextbox === target) {
+            //     editorInstance.hideLinkToolbar();
+            // }
 
             canvas.requestRenderAll();
         },
