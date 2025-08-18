@@ -8,12 +8,12 @@
     "license": "ISC",
     "keywords": [],
     "scripts": {
-    "dev": "webpack serve --config webpack.dev.js",
-    "build": "webpack --config webpack.prod.js"
+        "dev": "webpack serve --config webpack.dev.js",
+        "build": "webpack --config webpack.prod.js"
     },
     "dependencies": {
         "@gudhub/gh-html-element": "^1.4.5",
-        "fabric": "^6.7.1"
+        "fabric": "^5.3.0"
     },
     "devDependencies": {
         "@babel/core": "^7.28.0",

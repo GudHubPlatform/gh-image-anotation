@@ -25,6 +25,7 @@
 .toolbar {
   &__action-buttons {
     display: flex;
+    gap: 3px;
 
     button {
       width: 48px;
