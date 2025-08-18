@@ -1,5 +1,36 @@
 {
-  "devDependencies": {
-    "sass": "^1.89.2"
-  }
+    "name": "paintjs",
+    "version": "1.0.0",
+    "main": "script.js",
+    "type": "module",
+    "author": "",
+    "description": "",
+    "license": "ISC",
+    "keywords": [],
+    "scripts": {
+        "dev": "webpack serve --config webpack.dev.js",
+        "build": "webpack --config webpack.prod.js"
+    },
+    "dependencies": {
+        "@gudhub/gh-html-element": "^1.4.5",
+        "fabric": "^5.3.0"
+    },
+    "devDependencies": {
+        "@babel/core": "^7.28.0",
+        "@babel/preset-env": "^7.28.0",
+        "babel-loader": "^10.0.0",
+        "clean-webpack-plugin": "^4.0.0",
+        "css-loader": "^7.1.2",
+        "html-loader": "^5.1.0",
+        "html-webpack-plugin": "^5.6.3",
+        "mini-css-extract-plugin": "^2.9.2",
+        "sass": "^1.89.2",
+        "sass-loader": "^16.0.5",
+        "style-loader": "^4.0.0",
+        "to-string-loader": "^1.2.0",
+        "webpack": "^5.101.0",
+        "webpack-cli": "^6.0.1",
+        "webpack-dev-server": "^5.2.2",
+        "webpack-merge": "^6.0.1"
+    }
 }

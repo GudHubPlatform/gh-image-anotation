@@ -1,0 +1,115 @@
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+}
+
+#toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px;
+    background: #f0f0f0;
+    border-bottom: 1px solid #ccc;
+    align-items: center;
+}
+
+#toolbar button,
+#toolbar input[type="file"],
+#toolbar input[type="color"] {
+    padding: 5px 10px;
+}
+
+canvas {
+    border: 1px solid #ccc;
+    display: block;
+    margin: auto;
+}
+
+#colorPalette {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: auto;
+}
+
+.color-btn {
+    width: 24px;
+    height: 24px;
+    border: 1px solid #ccc;
+    cursor: pointer;
+    padding: 0;
+}
+
+#linkToolbar {
+    position: absolute;
+    display: none;
+    gap: 6px;
+    background: white;
+    border: 1px solid #ccc;
+    padding: 4px;
+    border-radius: 4px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.15);
+    z-index: 1000;
+}
+
+#pageManager {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px;
+    border-bottom: 1px solid #ccc;
+    background: #eaeaea;
+}
+
+.page-tab {
+    padding: 5px 10px;
+    background: #fff;
+    border: 1px solid #ccc;
+    cursor: pointer;
+    position: relative;
+    margin-right: 4px;
+}
+
+.page-tab.active {
+    background: #d0e0ff;
+    font-weight: bold;
+}
+
+.page-tab .close {
+    position: absolute;
+    top: 2px;
+    right: 4px;
+    font-size: 12px;
+    cursor: pointer;
+    color: red;
+}
+
+.canvas-page {
+    position: relative;
+}
+
+.slide-thumb {
+    border: 2px solid #444;
+    margin-bottom: 10px;
+    background: white;
+    padding: 4px;
+    position: relative;
+}
+
+.slide-thumb img {
+    width: 100%;
+}
+
+.slide-thumb .actions {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    display: flex;
+    gap: 4px;
+}
+
+.slide-thumb button {
+    font-size: 12px;
+    padding: 2px 6px;
+    cursor: pointer;
+}
