@@ -21,17 +21,48 @@ class GhAnnotationsViewer extends HTMLElement {
     `;
   }
 
-  init() {
+  async init() {
     const slideList = this.shadowRoot.querySelector('#slideList');
     const previewWrapper = this.shadowRoot.querySelector('#previewWrapper');
     const addSlideBtn = this.shadowRoot.querySelector('#addSlideBtn');
     const editBtn = this.shadowRoot.querySelector('#editBtn');
 
+    const appId   = '36609';
+    const itemId  = '4368318';
+    const fieldId = '862799';
+    const storageKey = this.getAttribute('storage-key') || 'slides';
+
+    const existing = JSON.parse(localStorage.getItem(storageKey) || '[]');
+    if (!existing.length && appId && itemId && fieldId) {
+      try {
+        const items = await gudhub.getItems({ app_id: appId, item_id: itemId });
+        const ghItem = Array.isArray(items) ? items[0] : items;
+        const images = (ghItem?.fields?.[fieldId]?.value) || [];
+
+        const slides = images.map((img, i) => {
+          const url = typeof img === 'string' ? img : (img.url || img.link || '');
+          return {
+            id: `slide-${Date.now()}-${i}`,
+            name: `Slide ${i + 1}`,
+            canvasJSON: null,
+            previewDataUrl: url,
+            bgUrl: url
+          };
+        }).filter(s => !!s.bgUrl);
+
+        if (slides.length) {
+          localStorage.setItem(storageKey, JSON.stringify(slides));
+        }
+      } catch (e) {
+        console.error('Failed to bootstrap slides from Gudhub:', e);
+      }
+    }
+
     this.manager = new ViewerManager({
       slideList,
       previewWrapper,
       editBtn,
-      storageKey: 'slides',
+      storageKey,
       onSlideSelect: () => {},
       onSlideEdit: (slide) => {
         this.dispatchEvent(new CustomEvent('edit', {
@@ -42,9 +73,7 @@ class GhAnnotationsViewer extends HTMLElement {
       }
     });
 
-    addSlideBtn.addEventListener('click', () => {
-      this.manager.addSlide();
-    });
+    addSlideBtn.addEventListener('click', () => this.manager.addSlide());
   }
 
   refreshSlides() {
