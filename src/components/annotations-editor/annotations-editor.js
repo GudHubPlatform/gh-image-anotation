@@ -31,12 +31,17 @@ class GhAnnotationsEditor extends HTMLElement {
 
     this.editor = new PaintEditor(this.shadowRoot);
 
-    if (this.currentSlideIndex !== -1 && slides[this.currentSlideIndex].canvasJSON) {
-      setTimeout(() => {
-        this.editor.canvas.loadFromJSON(slides[this.currentSlideIndex].canvasJSON, () => {
-          this.editor.canvas.renderAll();
-        });
-      }, 100);
+    if (this.currentSlideIndex !== -1) {
+      const slide = slides[this.currentSlideIndex];
+      if (slide.canvasJSON) {
+        setTimeout(() => {
+          this.editor.canvas.loadFromJSON(slide.canvasJSON, () => {
+            this.editor.canvas.renderAll();
+          });
+        }, 100);
+      } else if (slide.bgUrl && typeof this.editor.setBackgroundImageFromURL === 'function') {
+        this.editor.setBackgroundImageFromURL(slide.bgUrl);
+      }
     }
 
     this.shadowRoot.querySelector('#cancelBtn')?.addEventListener('click', () => {

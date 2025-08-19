@@ -28,27 +28,22 @@ class GhAnnotationsViewer extends HTMLElement {
     const editBtn = this.shadowRoot.querySelector('#editBtn');
 
     const appId   = '36609';
-    const itemId  = '4368318';
-    const fieldId = '862799';
     const storageKey = this.getAttribute('storage-key') || 'slides';
 
-    const existing = JSON.parse(localStorage.getItem(storageKey) || '[]');
-    if (!existing.length && appId && itemId && fieldId) {
+    if (appId) {
       try {
-        const items = await gudhub.getItems({ app_id: appId, item_id: itemId });
-        const ghItem = Array.isArray(items) ? items[0] : items;
-        const images = (ghItem?.fields?.[fieldId]?.value) || [];
+        const gudHubApp = await gudhub.getApp(appId);
+        const imagesUrl = gudHubApp?.fileList?.map(file => file?.url);
 
-        const slides = images.map((img, i) => {
-          const url = typeof img === 'string' ? img : (img.url || img.link || '');
-          return {
+        const slides = imagesUrl.map((url, i) => (
+          {
             id: `slide-${Date.now()}-${i}`,
             name: `Slide ${i + 1}`,
             canvasJSON: null,
             previewDataUrl: url,
             bgUrl: url
-          };
-        }).filter(s => !!s.bgUrl);
+          }
+        )).filter(s => !!s.bgUrl);
 
         if (slides.length) {
           localStorage.setItem(storageKey, JSON.stringify(slides));
