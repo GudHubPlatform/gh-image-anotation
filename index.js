@@ -5,9 +5,9 @@ import './src/components/annotations-editor/annotations-editor.js';
 import './src/components/annotations-viewer/annotations-viewer.js';
 
 export default class GhImageAnnotation {
-	/*------------------------------- FIELD TEMPLATE --------------------------------------*/
+    /*------------------------------- FIELD TEMPLATE --------------------------------------*/
 
-	getTemplate() {
+    getTemplate() {
         return {
             constructor: 'field',
             name: 'ImageAnnotation',
@@ -18,62 +18,96 @@ export default class GhImageAnnotation {
                 field_value: '',
                 data_type: 'image_annotation',
                 data_model: {
-                    interpretation: [{
-                        src: 'form',
-                        id: 'default',
-                        settings: {
-                            editable: 1,
-                            show_field_name: 1,
-                            show_field: 1
+                    watch: {
+                        app_id: null,
+                        field_id: null
+                    },
+                    interpretation: [
+                        {
+                            src: 'form',
+                            id: 'default',
+                            settings: {
+                                editable: 1,
+                                show_field_name: 1,
+                                show_field: 1,
+                            },
+                            style: { position: 'beetwen' },
                         },
-                        style: { position: "beetwen" }
-                    }]
-                }
-            }
+                    ],
+                },
+            },
         };
     }
 
-	/*------------------------------- INTERPRETATION --------------------------------------*/
+    /*------------------------------- INTERPRETATION --------------------------------------*/
 
-	getInterpretation(gudhub, value, appId, itemId, field_model) {
-		return [
-			{
-				id: 'default',
-				name: 'Default',
-				content: () => '<gh-image-annotation app-id="{{appId}}" item-id="{{itemId}}" field-id="{{fieldId}}"></gh-image-annotation>',
-			},
-			{
-				id: 'value',
-				name: 'Value',
-				content: () => value
-			}
-		];
-	}
-
-	/*--------------------------  SETTINGS --------------------------------*/
-
-    getSettings(scope) {
+    getInterpretation(gudhub, value, appId, itemId, field_model) {
         return [
-			{
-				title: 'Options',
-				type: 'general_setting',
-				icon: 'menu',
-				columns_list: [
-					[
-						{
-							type: 'ghElement',
-							property: 'data_model.color',
-							data_model: () => {
-								return {
-									data_type: 'color',
-									field_name: 'Color',
-									name_space: 'color'
-								}
-							}
-						}
-					]
-				]
-			}
-		];
+            {
+                id: 'default',
+                name: 'Default',
+                content: () =>
+                    '<gh-image-annotation app-id="{{appId}}" item-id="{{itemId}}" field-id="{{fieldId}}"></gh-image-annotation>',
+            },
+        ];
+    }
+
+    /*--------------------------  SETTINGS --------------------------------*/
+
+    getSettings() {
+        return [
+            {
+                title: 'Options',
+                type: 'general_setting',
+                icon: 'menu',
+                columns_list: [
+                    [
+                        {
+                            title: 'Image Source',
+                            type: 'header',
+                        },
+                        {
+                            type: 'ghElement',
+                            property: 'data_model.watch.app_id',
+                            data_model: function (fieldModel) {
+                                return {
+                                    field_name: 'Application with images',
+                                    data_type: 'app',
+                                    name_space: 'application',
+                                    data_model: {
+                                        current_app: false,
+                                        interpretation: [
+                                            {
+                                                src: 'form',
+                                                id: 'with_text',
+                                                settings: {
+                                                    editable: 1,
+                                                    show_field_name: 1,
+                                                    show_field: 1,
+                                                },
+                                            },
+                                        ],
+                                    },
+                                };
+                            },
+                        },
+                        {
+                            type: 'ghElement',
+                            property: 'data_model.watch.field_id',
+                            data_model: function (fieldModel, appId) {
+                                return {
+                                    data_model: {
+                                        app_id: appId,
+                                    },
+                                    field_name: 'Field with images',
+                                    name_space: 'field_with_images',
+                                    data_type: 'field',
+                                };
+                            },
+                        },
+                    ],
+                ],
+            },
+        ];
     }
 }

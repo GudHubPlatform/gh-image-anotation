@@ -5,7 +5,6 @@ import PaintEditor from './editor/PaintEditor.js';
 class GhAnnotationsEditor extends HTMLElement {
   constructor() {
     super();
-    this.attachShadow({ mode: 'open' });
     this.editor = null;
     this.currentSlideIndex = -1;
   }
@@ -16,7 +15,7 @@ class GhAnnotationsEditor extends HTMLElement {
   }
 
   render() {
-    this.shadowRoot.innerHTML = `
+    this.innerHTML = `
       <style>${styles}</style>
       ${html}
     `;
@@ -29,7 +28,7 @@ class GhAnnotationsEditor extends HTMLElement {
     let slides = JSON.parse(localStorage.getItem(storageKey) || '[]');
     this.currentSlideIndex = slides.findIndex(s => s.id === slideId);
 
-    this.editor = new PaintEditor(this.shadowRoot);
+    this.editor = new PaintEditor(this);
 
     if (this.currentSlideIndex !== -1) {
       const slide = slides[this.currentSlideIndex];
@@ -44,11 +43,11 @@ class GhAnnotationsEditor extends HTMLElement {
       }
     }
 
-    this.shadowRoot.querySelector('#cancelBtn')?.addEventListener('click', () => {
+    this.querySelector('#cancelBtn')?.addEventListener('click', () => {
       this.dispatchEvent(new CustomEvent('cancel', { bubbles: true, composed: true }));
     });
 
-    this.shadowRoot.querySelector('#finalSaveBtn')?.addEventListener('click', () => {
+    this.querySelector('#finalSaveBtn')?.addEventListener('click', () => {
       const json = this.editor.canvas.toJSON();
       const dataUrl = this.editor.canvas.toDataURL({ format: 'png' });
 

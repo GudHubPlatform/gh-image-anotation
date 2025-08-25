@@ -46,9 +46,13 @@ export function setupBackgroundTools(editor) {
   editor.setBackgroundImageFromURL = (url) => {
     if (!url) return;
     if (editor.disableDrawingMode) editor.disableDrawingMode();
-    fabric.Image.fromURL(url, (img) => {
-      placeAsBackground(img);
-    });
+    fabric.Image.fromURL(
+      url,
+      (img) => {
+        placeAsBackground(img);
+      },
+      { crossOrigin: 'anonymous' }
+    );
   };
 
   editor.restoreBackgroundImageScale = () => {

@@ -1,38 +1,32 @@
+import GhHtmlElement from '@gudhub/gh-html-element';
 import html from "./image-annotation.html";
 import styles from "./image-annotation.scss";
 
 import '../annotations-viewer/annotations-viewer.js';
 import '../annotations-editor/annotations-editor.js';
 
-class GhImageAnnotation extends HTMLElement {
+class GhImageAnnotation extends GhHtmlElement {
   constructor() {
     super();
-    this.attachShadow({ mode: 'open' });
   }
 
-  connectedCallback() {
-    this.render();
-    this.init();
-  }
-
-  render() {
-    this.shadowRoot.innerHTML = `
+  onInit() {
+    super.render(`
       <style>${styles}</style>
       ${html}
-    `;
-  }
+    `);
 
-  init() {
-    const viewerEl = this.shadowRoot.querySelector('gh-annotations-viewer');
-
-    viewerEl.addEventListener('edit', (e) => {
-      const { slideId } = e.detail;
-      this.showEditor(slideId);
-    });
+    const viewerEl = this.querySelector('gh-annotations-viewer');
+    if (viewerEl) {
+      viewerEl.addEventListener('edit', (e) => {
+        const { slideId } = e.detail;
+        this.showEditor(slideId);
+      });
+    }
   }
 
   showEditor(slideId) {
-    const editorWrapper = this.shadowRoot.querySelector('#editorWrapper');
+    const editorWrapper = this.querySelector('#editorWrapper');
 
     editorWrapper.innerHTML = '';
     const editorEl = document.createElement('gh-annotations-editor');
@@ -54,18 +48,18 @@ class GhImageAnnotation extends HTMLElement {
       }
 
       this.showViewer();
-      this.shadowRoot.querySelector('gh-annotations-viewer').refreshSlides();
+      this.querySelector('gh-annotations-viewer').refreshSlides();
     });
 
     editorWrapper.appendChild(editorEl);
 
-    this.shadowRoot.querySelector('#viewerWrapper').classList.add('hidden');
+    this.querySelector('#viewerWrapper').classList.add('hidden');
     editorWrapper.classList.remove('hidden');
   }
 
   showViewer() {
-    this.shadowRoot.querySelector('#editorWrapper').classList.add('hidden');
-    this.shadowRoot.querySelector('#viewerWrapper').classList.remove('hidden');
+    this.querySelector('#editorWrapper').classList.add('hidden');
+    this.querySelector('#viewerWrapper').classList.remove('hidden');
   }
 }
 
