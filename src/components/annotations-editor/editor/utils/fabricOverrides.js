@@ -28,12 +28,6 @@ export function applyFabricOverrides() {
             }
 
             canvas.remove(target);
-
-            // const editorInstance = window.editor;
-            // if (editorInstance?.activeLinkTextbox === target) {
-            //     editorInstance.hideLinkToolbar();
-            // }
-
             canvas.requestRenderAll();
         },
         render: function (ctx, left, top, styleOverride, fabricObject) {

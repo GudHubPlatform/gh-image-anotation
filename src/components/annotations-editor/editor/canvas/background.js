@@ -4,7 +4,7 @@ export function setupBackgroundTools(editor) {
     const canvasHeight = editor.canvas.getHeight();
     const padding = 300;
     const maxWidth = canvasWidth - padding * 2;
-    const maxHeight = canvasHeight;
+    const maxHeight = canvasHeight - padding;
     const scaleX = maxWidth / img.width;
     const scaleY = maxHeight / img.height;
     const scale = Math.min(scaleX, scaleY);
@@ -62,7 +62,7 @@ export function setupBackgroundTools(editor) {
     const canvasHeight = editor.canvas.getHeight();
     const padding = 300;
     const maxWidth = canvasWidth - padding * 2;
-    const maxHeight = canvasHeight;
+    const maxHeight = canvasHeight - padding;
     const scaleX = maxWidth / bg.width;
     const scaleY = maxHeight / bg.height;
     const scale = Math.min(scaleX, scaleY);

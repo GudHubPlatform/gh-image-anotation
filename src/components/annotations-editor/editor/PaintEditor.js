@@ -65,7 +65,7 @@ export default class PaintEditor {
         pageWrapper.className = 'canvas-page';
         const canvasEl = document.createElement('canvas');
         canvasEl.width = 1920;
-        canvasEl.height = 700;
+        canvasEl.height = 1080;
         pageWrapper.appendChild(canvasEl);
         canvasWrapper.appendChild(pageWrapper);
 

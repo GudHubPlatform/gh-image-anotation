@@ -7,7 +7,6 @@ let slides = JSON.parse(localStorage.getItem('slides') || '[]');
 let currentSlideIndex = slides.findIndex(s => s.id === slideId);
 
 const editor = new PaintEditor();
-window.editor = editor;
 
 if (currentSlideIndex !== -1 && slides[currentSlideIndex].canvasJSON) {
   setTimeout(() => {
