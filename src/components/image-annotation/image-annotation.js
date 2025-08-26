@@ -33,11 +33,11 @@ class GhImageAnnotation extends GhHtmlElement {
     editorEl.setAttribute('slide-id', slideId);
     editorEl.setAttribute('storage-key', 'slides');
 
-    editorEl.addEventListener('cancel', () => {
+    editorEl.addEventListener('editor:cancel', () => {
       this.showViewer();
     });
 
-    editorEl.addEventListener('save', (e) => {
+    editorEl.addEventListener('editor:save', (e) => {
       const { json, dataUrl, currentSlideIndex, storageKey } = e.detail;
       const slides = JSON.parse(localStorage.getItem(storageKey || 'slides') || '[]');
 

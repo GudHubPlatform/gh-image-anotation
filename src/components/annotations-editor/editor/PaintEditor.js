@@ -5,8 +5,7 @@ import { setupArrowTools } from './canvas/arrows.js';
 import { setupTextTools } from './canvas/text.js';
 import { setupLinkTools } from './canvas/links.js';
 import { setupBackgroundTools } from './canvas/background.js';
-import { handlePaste, handleCopy } from './clipboard/index.js';
-import { saveState } from './state/history.js';
+import { saveState, resetHistory } from './state/history.js';
 import { undo, redo } from './state/undoRedo.js';
 import { clearCanvas, saveImage } from './utils/helpers.js';
 import { setupToolbar } from './components/Toolbar.js';
@@ -23,12 +22,15 @@ export default class PaintEditor {
         this.pages = [];
         this.currentPageIndex = -1;
 
-        this.currentColor = '#000000';
+        this.currentColor = '#ff0000ff';
         this.isDrawingArrow = false;
         this.isTextInsertMode = false;
         this.arrowStart = null;
         this.tempArrow = null;
-        this.isRestoring = false;
+
+        this.restoreDepth = 0;
+
+        this._clipboard = null;
 
         this.saveStateBound = this.saveState.bind(this);
 
@@ -38,22 +40,47 @@ export default class PaintEditor {
     }
 
     init() {
-        this.root.addEventListener('paste', (e) => handlePaste(e, this));
-        this.root.addEventListener('copy', (e) => handleCopy(e, this));
+        this._onKeyDown = (e) => {
+            const platform = navigator.userAgentData?.platform || navigator.platform || '';
+            const isMac = /mac/i.test(platform);
+            const mod = isMac ? e.metaKey : e.ctrlKey;
+            if (!mod) return;
+
+            switch (e.code) {
+                case 'KeyC':
+                    e.preventDefault();
+                    this.copySelection();
+                    break;
+                case 'KeyV':
+                    e.preventDefault();
+                    this.pasteSelection();
+                    break;
+                case 'KeyZ':
+                    e.preventDefault();
+                    if (e.shiftKey) this.redo();
+                    else this.undo();
+                    break;
+                case 'KeyY':
+                    e.preventDefault();
+                    this.redo();
+                    break;
+            }
+        };
+
+        window.addEventListener('keydown', this._onKeyDown);
     }
 
     initUI() {
-        setupToolbar(this, this.root); 
+        setupToolbar(this, this.root);
         setupColorPalette(this);
         setupLinkToolbar(this);
 
-        const uploadBtn = this.root.querySelector('#custom-upload-btn');
+        const uploadBtn = this.root.querySelector('#upload-image-btn');
         const fileInput = this.root.querySelector('#input-image');
 
         if (uploadBtn && fileInput) {
-            uploadBtn.addEventListener('click', () => {
-                fileInput.click();
-            });
+            uploadBtn.addEventListener('click', () => fileInput.click());
+            fileInput.addEventListener('change', this.uploadImage.bind(this));
         }
 
         this.setupActiveToolHighlighting();
@@ -82,6 +109,8 @@ export default class PaintEditor {
         this.setCanvas(canvas);
         this.currentPageIndex = 0;
         canvas.renderAll();
+
+        resetHistory(this);
     }
 
     setCanvas(canvas) {
@@ -92,26 +121,48 @@ export default class PaintEditor {
         setupTextTools(this);
         setupLinkTools(this);
         setupBackgroundTools(this);
+
+        this.canvas.on('object:modified', () => {
+            if (this.restoreDepth > 0) return;
+            this.saveState();
+        });
+        this.canvas.on('object:removed', () => {
+            if (this.restoreDepth > 0) return;
+            this.saveState();
+        });
+        this.canvas.on('path:created', () => {
+            if (this.restoreDepth > 0) return;
+            this.saveState();
+        });
+        this.canvas.on('object:added', (e) => {
+            if (this.restoreDepth > 0) return;
+            if (e?.target?.type === 'path') return;
+            this.saveState();
+        });
     }
 
-    saveState() {
-        saveState(this);
+    saveState() { 
+        saveState(this); 
     }
 
     undo() {
         undo(this);
+        this.enableMouseTool?.();
+        this.flashButtonOnly?.('btn-undo', 1000);
     }
 
     redo() {
         redo(this);
+        this.enableMouseTool?.();
+        this.flashButtonOnly?.('btn-redo', 1000);
     }
 
     clearCanvas() {
         clearCanvas(this);
     }
 
-    saveImage() {
-        saveImage(this);
+    saveImage() { 
+        saveImage(this); 
     }
 
     updateActiveObjectColor(color) {
@@ -157,15 +208,20 @@ export default class PaintEditor {
             const tool = btn.id;
 
             btn.addEventListener('click', () => {
-                buttons.forEach(b => b.classList.remove('active'));
+            if (tool === 'btn-undo' || tool === 'btn-redo') {
+                this.enableMouseTool?.();           
+                this.setActiveButton?.('btn-mouse');
+                return;
+            }
 
-                btn.classList.add('active');
+            buttons.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
 
-                if (tool !== 'btn-mouse') {
-                    this.activateToolOnce(tool);
-                } else {
-                    this.enableMouseTool();
-                }
+            if (tool !== 'btn-mouse') {
+                this.activateToolOnce(tool);
+            } else {
+                this.enableMouseTool();
+            }
             });
         });
 
@@ -176,33 +232,51 @@ export default class PaintEditor {
         }
     }
 
+    setActiveNone() {
+        const buttons = this.root.querySelectorAll('.toolbar__action-buttons button');
+        buttons.forEach(b => b.classList.remove('active'));
+    }
+
+    flashButtonOnly(buttonId, duration = 1000) {
+        this.setActiveNone();
+        const btn = this.root.querySelector(`#${buttonId}`);
+        if (btn) btn.classList.add('active');
+
+        setTimeout(() => {
+            const active = this.root.querySelector('.toolbar__action-buttons button.active');
+            if (active && active.id === buttonId) {
+                this.setActiveNone();
+            }
+        }, duration);
+    }
+
     activateToolOnce(toolId) {
         switch (toolId) {
             case 'btn-draw':
+                this.isDrawingArrow = false;
+                this.isTextInsertMode = false;
                 this.canvas.isDrawingMode = true;
-
-                this.canvas.once('mouse:up', () => {
-                    this.canvas.isDrawingMode = false;
-                    this.enableMouseTool();
-                    this.setActiveButton('btn-mouse');
-                });
+                this.canvas.selection = false;
+                if (this.canvas.freeDrawingBrush) {
+                    this.canvas.freeDrawingBrush.color = this.currentColor;
+                }
                 break;
 
             case 'btn-add-arrow':
                 this.isDrawingArrow = true;
-
-                this.canvas.once('mouse:up', () => {
-                    this.isDrawingArrow = false;
-                    this.enableMouseTool();
-                    this.setActiveButton('btn-mouse');
-                });
+                this.canvas.isDrawingMode = false;
+                this.canvas.selection = false;
                 break;
 
             case 'btn-add-text':
                 this.isTextInsertMode = true;
+                this.canvas.isDrawingMode = false;
+                this.canvas.selection = false;
                 break;
 
             case 'btn-add-link':
+                this.canvas.isDrawingMode = false;
+                this.addLink?.();
                 break;
 
             default:
@@ -215,5 +289,80 @@ export default class PaintEditor {
         buttons.forEach(b => b.classList.remove('active'));
         const btn = this.root.querySelector(`#${buttonId}`);
         btn?.classList.add('active');
+    }
+
+    uploadImage(e) {
+        const file = e?.target?.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+            fabric.Image.fromURL(evt.target.result, (img) => {
+                const cw = this.canvas.getWidth();
+                const ch = this.canvas.getHeight();
+
+                img.set({
+                    left: cw / 2,
+                    top: ch / 2,
+                    originX: 'center',
+                    originY: 'center',
+                    selectable: true,
+                    objectCaching: false
+                });
+
+                const maxW = cw * 0.9;
+                const maxH = ch * 0.9;
+                const scale = Math.min(
+                    1,
+                    maxW / (img.width || maxW),
+                    maxH / (img.height || maxH)
+                );
+                if (scale < 1) img.scale(scale);
+
+                this.canvas.add(img);
+                this.canvas.setActiveObject(img);
+                this.canvas.requestRenderAll();
+
+                this.enableMouseTool();
+                this.setActiveButton('btn-mouse');
+            }, { crossOrigin: 'anonymous' });
+        };
+        reader.readAsDataURL(file);
+
+        if (e?.target) e.target.value = '';
+    }
+
+    copySelection() {
+        const active = this.canvas.getActiveObject();
+        if (!active) return;
+        active.clone((cloned) => { this._clipboard = cloned; });
+    }
+
+    pasteSelection() {
+        if (!this._clipboard) return;
+
+        this._clipboard.clone((clonedObj) => {
+            this.canvas.discardActiveObject();
+
+            clonedObj.set({
+                left: (clonedObj.left || 0) + 20,
+                top: (clonedObj.top || 0) + 20,
+                evented: true
+            });
+
+            if (clonedObj.type === 'activeSelection') {
+                clonedObj.canvas = this.canvas;
+                clonedObj.forEachObject(obj => {
+                    obj.set({ left: obj.left + 20, top: obj.top + 20 });
+                    this.canvas.add(obj);
+                });
+                clonedObj.setCoords();
+            } else {
+                this.canvas.add(clonedObj);
+            }
+
+            this.canvas.setActiveObject(clonedObj);
+            this.canvas.requestRenderAll();
+        });
     }
 }

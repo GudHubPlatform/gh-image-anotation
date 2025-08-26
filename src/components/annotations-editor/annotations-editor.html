@@ -53,7 +53,7 @@
                 </svg>
             </button>
 
-            <button type="button" id="custom-upload-btn" aria-label="Upload image">
+            <button type="button" id="upload-image-btn" aria-label="Upload image">
                 <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 26 26" fill="none">
                     <g clip-path="url(#clip0_5409_293)">
                         <path d="M3.94971 0.484863H21.4497C22.4652 0.484863 23.3254 0.839116 24.0356 1.54932C24.7458 2.25952 25.1001 3.11981 25.1001 4.13525V21.6353C25.1001 22.6507 24.7458 23.511 24.0356 24.2212C23.3254 24.9314 22.4652 25.2856 21.4497 25.2856H3.94971C2.93426 25.2856 2.07397 24.9314 1.36377 24.2212C0.65357 23.511 0.299316 22.6507 0.299316 21.6353V4.13525C0.299316 3.11981 0.653569 2.25952 1.36377 1.54932C2.07397 0.839116 2.93426 0.484863 3.94971 0.484863ZM3.94971 2.78564C3.61781 2.78564 3.32933 2.88442 3.08838 3.08252L2.98779 3.17334C2.72903 3.43301 2.6001 3.75596 2.6001 4.13525V21.6353C2.6001 22.0146 2.72891 22.3373 2.98779 22.5962C3.24741 22.8557 3.57037 22.9849 3.94971 22.9849H21.4497C21.8291 22.9849 22.1518 22.8559 22.4106 22.5962C22.6703 22.3374 22.7993 22.0146 22.7993 21.6353V4.13525C22.7993 3.75592 22.6702 3.43296 22.4106 3.17334C22.1518 2.91446 21.829 2.78564 21.4497 2.78564H3.94971ZM19.9917 20.2856H5.43994L10.1997 15.5259L12.3794 17.6753L12.4585 17.7534L12.5278 17.6665L15.1997 14.2954L19.9917 20.2856ZM7.69971 5.48486C8.36039 5.48486 8.92363 5.7196 9.39502 6.19092C9.86556 6.66146 10.1001 7.22446 10.1001 7.88525C10.1001 8.54605 9.86556 9.10905 9.39502 9.57959C8.92363 10.0509 8.36038 10.2856 7.69971 10.2856C7.12157 10.2856 6.61805 10.1062 6.18604 9.74561L6.00537 9.57959C5.53401 9.10903 5.29932 8.54599 5.29932 7.88525C5.29932 7.30712 5.47875 6.8036 5.83936 6.37158L6.00537 6.19092C6.47593 5.71956 7.03897 5.48486 7.69971 5.48486Z" fill="#787878" stroke="white" stroke-width="0.2"/>
@@ -87,7 +87,10 @@
             </button>
 
             <div id="colorPalette">
-                <input type="color" id="customColor" title="Pick custom color" />
+                <label class="color-picker-wrapper">
+                    <span class="color-preview"></span>
+                    <input type="color" id="customColor" title="Pick custom color" />
+                </label>
             </div>
         </div>
 
@@ -95,11 +98,59 @@
             <button id="cancelBtn">Cancel</button>
             <button id="finalSaveBtn">Save</button>
         </div>
-        
-        <!-- <button id="btn-clear">Clear</button>
-        <button id="btn-save">Save Image</button>
-        <button id="btn-set-bg">Set Background</button> -->
     </div>
 
     <div id="canvasWrapper"></div>
+
+    <!-- Link Toolbar -->
+    <div id="linkToolbar" style="
+        position:fixed;
+        display:none;
+        z-index:9999;
+        gap:8px;
+        background:#fff;
+        border:1px solid #e5e5e5;
+        border-radius:8px;
+        padding:6px 8px;
+        box-shadow:0 6px 24px rgba(0,0,0,.12);
+    "></div>
+
+    <!-- Link Modal -->
+    <div id="linkModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:99999; align-items:center; justify-content:center;">
+        <div style="background:#fff; border-radius:10px; width:420px; max-width:calc(100% - 32px); padding:16px; box-shadow:0 10px 30px rgba(0,0,0,.2);">
+            <h3 id="linkModalTitle" style="margin:0 0 12px;">Add Link</h3>
+            <div style="display:flex; flex-direction:column; gap:8px;">
+                <label style="font-size:12px; color:#555;">Text</label>
+                <input id="linkModalText" type="text" placeholder="Link text" style="padding:8px 10px; border:1px solid #ddd; border-radius:8px;" />
+                <label style="font-size:12px; color:#555; margin-top:6px;">URL</label>
+                <input id="linkModalUrl" type="url" placeholder="https://example.com" style="padding:8px 10px; border:1px solid #ddd; border-radius:8px;" />
+            </div>
+            <div style="margin-top:14px; display:flex; justify-content:flex-end; gap:8px;">
+                <button id="linkModalCancel" type="button">Cancel</button>
+                <button id="linkModalSave" type="button">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Unsaved changes modal -->
+    <div id="unsavedModal" style="
+        position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
+        background: rgba(0,0,0,0.45); z-index: 9999;
+    ">
+        <div style="
+            background: #fff; min-width: 360px; max-width: 90vw; padding: 20px; border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15); font-family: system-ui, sans-serif;
+        ">
+            <div style="font-size: 18px; font-weight: 600; margin-bottom: 8px;">
+                Є незбережені зміни
+            </div>
+            <div style="font-size: 14px; color: #444; margin-bottom: 16px;">
+                Ви впевнені, що хочете вийти без збереження?
+            </div>
+            <div style="display: flex; gap: 8px; justify-content: flex-end;">
+                <button id="modalContinueBtn" style="padding: 8px 12px; border-radius: 8px; border: 1px solid #ddd; background:#f5f5f5;">Продовжити редагування</button>
+                <button id="modalDiscardBtn" style="padding: 8px 12px; border-radius: 8px; border: none; background:#e53935; color: #fff;">Вийти без збереження</button>
+            </div>
+        </div>
+    </div>
 </div>

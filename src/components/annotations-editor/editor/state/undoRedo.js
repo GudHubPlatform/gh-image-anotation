@@ -1,7 +1,7 @@
 export function undo(editor) {
     const page = editor.pages[editor.currentPageIndex];
     if (page.history.length > 1) {
-        const currentState = JSON.stringify(editor.canvas);
+        const currentState = JSON.stringify(editor.canvas.toJSON());
         page.redoStack.push(currentState);
         page.history.pop();
 
@@ -9,6 +9,7 @@ export function undo(editor) {
         editor.isRestoring = true;
         editor.canvas.loadFromJSON(previous, () => {
             editor.restoreBackgroundImageScale?.();
+            editor.rebuildTextHelpers?.();
             editor.isRestoring = false;
             editor.canvas.renderAll();
         });
@@ -24,6 +25,7 @@ export function redo(editor) {
         editor.isRestoring = true;
         editor.canvas.loadFromJSON(next, () => {
             editor.restoreBackgroundImageScale?.();
+            editor.rebuildTextHelpers?.();
             editor.isRestoring = false;
             editor.canvas.renderAll();
         });

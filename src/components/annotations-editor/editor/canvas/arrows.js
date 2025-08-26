@@ -11,7 +11,7 @@ export function setupArrowTools(editor) {
         editor.canvas.selection = false;
     };
 
-    editor.onMouseMove = function (opt) {
+   editor.onMouseMove = function (opt) {
         if (!this.isDrawingArrow || !this.arrowStart) return;
 
         const pointer = this.canvas.getPointer(opt.e);
@@ -22,7 +22,7 @@ export function setupArrowTools(editor) {
 
         if (this.tempArrow) this.canvas.remove(this.tempArrow);
 
-        this.tempArrow = this.createArrow(fromX, fromY, toX, toY, this.currentColor);
+        this.tempArrow = this.createArrow(fromX, fromY, toX, toY, this.currentColor, /*isTemp*/ true);
         this.canvas.add(this.tempArrow);
         this.canvas.requestRenderAll();
     };
@@ -35,18 +35,25 @@ export function setupArrowTools(editor) {
 
         this.isAddingFinalArrow = true;
 
+        const c = this.canvas;
+        c.off('object:added', this.saveStateBound);
+
         const finalArrow = this.createArrow(
             this.arrowStart.x,
             this.arrowStart.y,
             pointer.x,
             pointer.y,
-            this.currentColor
+            this.currentColor,
+            false
         );
 
-        this.canvas.add(finalArrow);
-        this.canvas.setActiveObject(finalArrow);
-        this.canvas.requestRenderAll();
+        c.add(finalArrow);
+        c.setActiveObject(finalArrow);
+
+        c.on('object:added', this.saveStateBound);
         this.saveState();
+
+        c.requestRenderAll();
 
         this.isAddingFinalArrow = false;
         this.tempArrow = null;
@@ -55,6 +62,9 @@ export function setupArrowTools(editor) {
         this.canvas.defaultCursor = 'default';
 
         this.unlockCanvasInteractions();
+
+        this.enableMouseTool?.();
+        this.setActiveButton?.('btn-mouse');
     };
 
     editor.onMouseDown = function (e) {
@@ -64,7 +74,7 @@ export function setupArrowTools(editor) {
         }
     };
 
-    editor.createArrow = function (fromX, fromY, toX, toY, color) {
+    editor.createArrow = function (fromX, fromY, toX, toY, color, isTemp = false) {
         const dx = toX - fromX;
         const dy = toY - fromY;
         const angle = Math.atan2(dy, dx);
@@ -90,25 +100,27 @@ export function setupArrowTools(editor) {
         const shaft = new fabric.Line([fromX, fromY, base.x, base.y], {
             stroke: color,
             strokeWidth: 2,
-            selectable: false,
-            evented: false
+            selectable: !isTemp,
+            evented: !isTemp
         });
 
         const head = new fabric.Polygon([tip, left, right], {
             fill: color,
-            selectable: false,
-            evented: false,
+            selectable: !isTemp,
+            evented: !isTemp,
             objectCaching: false
         });
 
         return new fabric.Group([shaft, head], {
             left: Math.min(fromX, toX),
             top: Math.min(fromY, toY),
-            selectable: true,
-            evented: true,
+            selectable: !isTemp,
+            evented: !isTemp,
             objectCaching: false,
-            hasControls: true,
-            hasBorders: true
+            hasControls: !isTemp,
+            hasBorders: !isTemp,
+            subTargetCheck: false,
+            perPixelTargetFind: false
         });
     };
 };

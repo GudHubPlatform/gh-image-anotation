@@ -9,8 +9,8 @@ export function applyFabricOverrides() {
     fabric.Object.prototype.controls.deleteControl = new fabric.Control({
         x: -0.5,
         y: -0.5,
-        offsetY: -25,
-        offsetX: -25,
+        offsetY: -18,
+        offsetX: -18,
         sizeX: 20,
         sizeY: 20,
         cornerSize: 20,
