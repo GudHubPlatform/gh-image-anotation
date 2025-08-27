@@ -103,53 +103,38 @@
     <div id="canvasWrapper"></div>
 
     <!-- Link Toolbar -->
-    <div id="linkToolbar" style="
-        position:fixed;
-        display:none;
-        z-index:9999;
-        gap:8px;
-        background:#fff;
-        border:1px solid #e5e5e5;
-        border-radius:8px;
-        padding:6px 8px;
-        box-shadow:0 6px 24px rgba(0,0,0,.12);
-    "></div>
+    <div id="linkToolbar" class="link-toolbar"></div>
 
     <!-- Link Modal -->
-    <div id="linkModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:99999; align-items:center; justify-content:center;">
-        <div style="background:#fff; border-radius:10px; width:420px; max-width:calc(100% - 32px); padding:16px; box-shadow:0 10px 30px rgba(0,0,0,.2);">
-            <h3 id="linkModalTitle" style="margin:0 0 12px;">Add Link</h3>
-            <div style="display:flex; flex-direction:column; gap:8px;">
-                <label style="font-size:12px; color:#555;">Text</label>
-                <input id="linkModalText" type="text" placeholder="Link text" style="padding:8px 10px; border:1px solid #ddd; border-radius:8px;" />
-                <label style="font-size:12px; color:#555; margin-top:6px;">URL</label>
-                <input id="linkModalUrl" type="url" placeholder="https://example.com" style="padding:8px 10px; border:1px solid #ddd; border-radius:8px;" />
+    <div id="linkModal" class="link-modal">
+        <div class="link-modal__content">
+            <h3 id="linkModalTitle" class="link-modal__title">Add Link</h3>
+            <div class="link-modal__form">
+                <label for="linkModalText" class="link-modal__label">Text</label>
+                <input id="linkModalText" type="text" placeholder="Link text" class="link-modal__input" />
+                
+                <label for="linkModalUrl" class="link-modal__label link-modal__label--spaced">URL</label>
+                <input id="linkModalUrl" type="url" placeholder="https://example.com" class="link-modal__input" />
             </div>
-            <div style="margin-top:14px; display:flex; justify-content:flex-end; gap:8px;">
-                <button id="linkModalCancel" type="button">Cancel</button>
-                <button id="linkModalSave" type="button">Save</button>
+            <div class="link-modal__actions">
+                <button id="linkModalCancel" type="button" class="link-modal__btn">Cancel</button>
+                <button id="linkModalSave" type="button" class="link-modal__btn link-modal__btn--primary">Save</button>
             </div>
         </div>
     </div>
 
     <!-- Unsaved changes modal -->
-    <div id="unsavedModal" style="
-        position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
-        background: rgba(0,0,0,0.45); z-index: 9999;
-    ">
-        <div style="
-            background: #fff; min-width: 360px; max-width: 90vw; padding: 20px; border-radius: 12px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.15); font-family: system-ui, sans-serif;
-        ">
-            <div style="font-size: 18px; font-weight: 600; margin-bottom: 8px;">
-                Є незбережені зміни
+    <div id="unsavedModal" class="unsaved-modal">
+        <div class="unsaved-modal__content">
+            <div class="unsaved-modal__header">
+                <p>There are unsaved changes</p>
             </div>
-            <div style="font-size: 14px; color: #444; margin-bottom: 16px;">
-                Ви впевнені, що хочете вийти без збереження?
+            <div class="unsaved-modal__body">
+                <p>Are you sure you want to exit without saving?</p>
             </div>
-            <div style="display: flex; gap: 8px; justify-content: flex-end;">
-                <button id="modalContinueBtn" style="padding: 8px 12px; border-radius: 8px; border: 1px solid #ddd; background:#f5f5f5;">Продовжити редагування</button>
-                <button id="modalDiscardBtn" style="padding: 8px 12px; border-radius: 8px; border: none; background:#e53935; color: #fff;">Вийти без збереження</button>
+            <div class="unsaved-modal__actions">
+                <button id="modalContinueBtn" class="unsaved-modal__btn">Continue editing</button>
+                <button id="modalDiscardBtn" class="unsaved-modal__btn unsaved-modal__btn--danger">Exit without saving</button>
             </div>
         </div>
     </div>

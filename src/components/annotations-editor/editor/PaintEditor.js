@@ -147,14 +147,12 @@ export default class PaintEditor {
 
     undo() {
         undo(this);
-        this.enableMouseTool?.();
-        this.flashButtonOnly?.('btn-undo', 1000);
+        this.setActiveButton?.('btn-undo');
     }
 
     redo() {
         redo(this);
-        this.enableMouseTool?.();
-        this.flashButtonOnly?.('btn-redo', 1000);
+        this.setActiveButton?.('btn-redo');
     }
 
     clearCanvas() {
@@ -208,20 +206,31 @@ export default class PaintEditor {
             const tool = btn.id;
 
             btn.addEventListener('click', () => {
-            if (tool === 'btn-undo' || tool === 'btn-redo') {
-                this.enableMouseTool?.();           
-                this.setActiveButton?.('btn-mouse');
-                return;
-            }
+                if (tool === 'btn-undo' || tool === 'btn-redo') {
+                    buttons.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
 
-            buttons.forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
+                    setTimeout(() => {
+                        btn.classList.remove('active');
+                        const mouseBtn = this.root.querySelector('#btn-mouse');
+                        if (mouseBtn) {
+                            mouseBtn.classList.add('active');
+                        }
+                        this.enableMouseTool?.();
+                        this.setActiveButton?.('btn-mouse');
+                    }, 250);
 
-            if (tool !== 'btn-mouse') {
-                this.activateToolOnce(tool);
-            } else {
-                this.enableMouseTool();
-            }
+                    return;
+                }
+
+                buttons.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+
+                if (tool !== 'btn-mouse') {
+                    this.activateToolOnce(tool);
+                } else {
+                    this.enableMouseTool();
+                }
             });
         });
 
@@ -230,24 +239,6 @@ export default class PaintEditor {
             mouseBtn.classList.add('active');
             this.enableMouseTool();
         }
-    }
-
-    setActiveNone() {
-        const buttons = this.root.querySelectorAll('.toolbar__action-buttons button');
-        buttons.forEach(b => b.classList.remove('active'));
-    }
-
-    flashButtonOnly(buttonId, duration = 1000) {
-        this.setActiveNone();
-        const btn = this.root.querySelector(`#${buttonId}`);
-        if (btn) btn.classList.add('active');
-
-        setTimeout(() => {
-            const active = this.root.querySelector('.toolbar__action-buttons button.active');
-            if (active && active.id === buttonId) {
-                this.setActiveNone();
-            }
-        }, duration);
     }
 
     activateToolOnce(toolId) {

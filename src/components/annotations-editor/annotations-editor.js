@@ -4,130 +4,152 @@ import PaintEditor from './editor/PaintEditor.js';
 import { resetHistory } from './editor/state/history.js';
 
 class GhAnnotationsEditor extends HTMLElement {
-  constructor() {
-    super();
-    this.editor = null;
-    this.currentSlideIndex = -1;
+    constructor() {
+        super();
+        this.editor = null;
+        this.currentSlideIndex = -1;
 
-    this._initialCanvasJSON = null;
-    this._modal = null;
-    this._modalContinueBtn = null;
-    this._modalDiscardBtn = null;
-    this._modalWired = false;
-  }
-
-  connectedCallback() {
-    this.render();
-    this.init();
-  }
-
-  render() {
-    this.innerHTML = `
-      <style>${styles}</style>
-      ${html}
-    `;
-  }
-
-  _captureInitial() {
-    if (!this.editor?.canvas) return;
-    try { this._initialCanvasJSON = JSON.stringify(this.editor.canvas.toJSON()); }
-    catch { this._initialCanvasJSON = null; }
-  }
-
-  _hasUnsavedChanges() {
-    if (!this.editor?.canvas || this._initialCanvasJSON == null) return false;
-    try { return JSON.stringify(this.editor.canvas.toJSON()) !== this._initialCanvasJSON; }
-    catch { return false; }
-  }
-
-  _wireModal() {
-    if (this._modalWired) return;
-    this._modal = this.querySelector('#unsavedModal');
-    this._modalContinueBtn = this.querySelector('#modalContinueBtn');
-    this._modalDiscardBtn = this.querySelector('#modalDiscardBtn');
-    if (!this._modal) return;
-
-    this._modal.addEventListener('click', (e) => {
-      if (e.target === this._modal) this._hideModal();
-    });
-
-    this._modalContinueBtn?.addEventListener('click', () => this._hideModal());
-
-    this._modalDiscardBtn?.addEventListener('click', () => {
-      this._hideModal();
-      this.dispatchEvent(new CustomEvent('editor:cancel', { bubbles: true, composed: true }));
-    });
-
-    this._escHandler = (e) => {
-      if (e.key === 'Escape' && this._modal?.style.display === 'flex') this._hideModal();
-    };
-    document.addEventListener('keydown', this._escHandler);
-
-    this._modalWired = true;
-  }
-  _showModal() { this._wireModal(); if (this._modal) { this._modal.style.display = 'flex'; this._modalContinueBtn?.focus(); } }
-  _hideModal() { if (this._modal) this._modal.style.display = 'none'; }
-
-  init() {
-    const slideId = this.getAttribute('slide-id');
-    const storageKey = this.getAttribute('storage-key') || 'slides';
-
-    let slides = JSON.parse(localStorage.getItem(storageKey) || '[]');
-    this.currentSlideIndex = slides.findIndex(s => s.id === slideId);
-
-    this.editor = new PaintEditor(this);
-
-    if (this.currentSlideIndex !== -1) {
-      const slide = slides[this.currentSlideIndex];
-
-      if (slide.canvasJSON) {
-        this.editor.isRestoring = true;
-        this.editor.canvas.loadFromJSON(slide.canvasJSON, () => {
-          this.editor.canvas.renderAll();
-          this.editor.isRestoring = false;
-          resetHistory(this.editor);
-          this._captureInitial();
-        });
-      } else if (slide.bgUrl && typeof this.editor.setBackgroundImageFromURL === 'function') {
-        this.editor.setBackgroundImageFromURL(slide.bgUrl);
-        resetHistory(this.editor);
-        const once = () => {
-          this.editor.canvas.off('after:render', once);
-          this._captureInitial();
-        };
-        this.editor.canvas.on('after:render', once);
-      } else {
-        resetHistory(this.editor);
-        setTimeout(() => this._captureInitial(), 0);
-      }
-    } else {
-      resetHistory(this.editor);
-      setTimeout(() => this._captureInitial(), 0);
+        this._initialCanvasJSON = null;
+        this._modal = null;
+        this._modalContinueBtn = null;
+        this._modalDiscardBtn = null;
+        this._modalWired = false;
     }
 
-    this.querySelector('#cancelBtn')?.addEventListener('click', () => {
-      if (this._hasUnsavedChanges()) {
-        this._showModal();
-        return;
-      }
-      this.dispatchEvent(new CustomEvent('editor:cancel', { bubbles: true, composed: true }));
-    });
+    connectedCallback() {
+        this.render();
+        this.init();
+    }
 
-    this.querySelector('#finalSaveBtn')?.addEventListener('click', () => {
-      const json = this.editor.canvas.toJSON();
-      const dataUrl = this.editor.canvas.toDataURL({ format: 'png' });
+    render() {
+        this.innerHTML = `
+            <style>${styles}</style>
+            ${html}
+        `;
+    }
 
-      try { this._initialCanvasJSON = JSON.stringify(json); } catch {}
+    _captureInitial() {
+        if (!this.editor?.canvas) return;
+        try {
+            this._initialCanvasJSON = JSON.stringify(this.editor.canvas.toJSON());
+        } catch {
+            this._initialCanvasJSON = null;
+        }
+    }
 
-      this.dispatchEvent(new CustomEvent('editor:save', {
-        bubbles: true,
-        composed: true,
-        detail: { json, dataUrl, currentSlideIndex: this.currentSlideIndex, storageKey }
-      }));
-    });
-  }
+    _hasUnsavedChanges() {
+        if (!this.editor?.canvas || this._initialCanvasJSON == null) return false;
+        try {
+            return JSON.stringify(this.editor.canvas.toJSON()) !== this._initialCanvasJSON;
+        } catch {
+            return false;
+        }
+    }
+
+    _wireModal() {
+        if (this._modalWired) return;
+        this._modal = this.querySelector('#unsavedModal');
+        this._modalContinueBtn = this.querySelector('#modalContinueBtn');
+        this._modalDiscardBtn = this.querySelector('#modalDiscardBtn');
+        if (!this._modal) return;
+
+        this._modal.addEventListener('click', (e) => {
+            if (e.target === this._modal) this._hideModal();
+        });
+
+        this._modalContinueBtn?.addEventListener('click', () => this._hideModal());
+
+        this._modalDiscardBtn?.addEventListener('click', () => {
+            this._hideModal();
+            this.dispatchEvent(new CustomEvent('editor:cancel', { bubbles: true, composed: true }));
+        });
+
+        this._escHandler = (e) => {
+            if (e.key === 'Escape' && this._modal?.classList.contains('unsaved-modal--active')) {
+                this._hideModal();
+            }
+        };
+        document.addEventListener('keydown', this._escHandler);
+
+        this._modalWired = true;
+    }
+
+    _showModal() {
+        this._wireModal();
+        if (this._modal) {
+            this._modal.classList.add('unsaved-modal--active');
+            this._modalContinueBtn?.focus();
+        }
+    }
+
+    _hideModal() {
+        if (this._modal) {
+            this._modal.classList.remove('unsaved-modal--active');
+        }
+    }
+
+    init() {
+        const slideId = this.getAttribute('slide-id');
+        const storageKey = this.getAttribute('storage-key') || 'slides';
+
+        let slides = JSON.parse(localStorage.getItem(storageKey) || '[]');
+        this.currentSlideIndex = slides.findIndex(s => s.id === slideId);
+
+        this.editor = new PaintEditor(this);
+
+        if (this.currentSlideIndex !== -1) {
+            const slide = slides[this.currentSlideIndex];
+
+            if (slide.canvasJSON) {
+                this.editor.isRestoring = true;
+                this.editor.canvas.loadFromJSON(slide.canvasJSON, () => {
+                    this.editor.canvas.renderAll();
+                    this.editor.isRestoring = false;
+                    resetHistory(this.editor);
+                    this._captureInitial();
+                });
+            } else if (slide.bgUrl && typeof this.editor.setBackgroundImageFromURL === 'function') {
+                this.editor.setBackgroundImageFromURL(slide.bgUrl);
+                resetHistory(this.editor);
+                const once = () => {
+                    this.editor.canvas.off('after:render', once);
+                    this._captureInitial();
+                };
+                this.editor.canvas.on('after:render', once);
+            } else {
+                resetHistory(this.editor);
+                setTimeout(() => this._captureInitial(), 0);
+            }
+        } else {
+            resetHistory(this.editor);
+            setTimeout(() => this._captureInitial(), 0);
+        }
+
+        this.querySelector('#cancelBtn')?.addEventListener('click', () => {
+            if (this._hasUnsavedChanges()) {
+                this._showModal();
+                return;
+            }
+            this.dispatchEvent(new CustomEvent('editor:cancel', { bubbles: true, composed: true }));
+        });
+
+        this.querySelector('#finalSaveBtn')?.addEventListener('click', () => {
+            const json = this.editor.canvas.toJSON();
+            const dataUrl = this.editor.canvas.toDataURL({ format: 'png' });
+
+            try {
+                this._initialCanvasJSON = JSON.stringify(json);
+            } catch {}
+
+            this.dispatchEvent(new CustomEvent('editor:save', {
+                bubbles: true,
+                composed: true,
+                detail: { json, dataUrl, currentSlideIndex: this.currentSlideIndex, storageKey }
+            }));
+        });
+    }
 }
 
 if (!window.customElements.get('gh-annotations-editor')) {
-  window.customElements.define('gh-annotations-editor', GhAnnotationsEditor);
+    window.customElements.define('gh-annotations-editor', GhAnnotationsEditor);
 }
