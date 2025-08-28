@@ -3,9 +3,9 @@ export function setupLinkToolbar(editor) {
     if (!toolbar) return;
 
     toolbar.innerHTML = `
-        <button id="linkEditText">Edit</button>
-        <button id="linkOpen">Open</button>
-        <button id="linkDelete">Delete</button>
+        <button id="linkEditText" class="link-toolbar__button link-toolbar__button--edit">Edit</button>
+        <button id="linkOpen" class="link-toolbar__button link-toolbar__button--open">Open</button>
+        <button id="linkDelete" class="link-toolbar__button link-toolbar__button--delete">Delete</button>
     `;
 
     editor.root.querySelector('#linkEditText')?.addEventListener('click', () => editor.editLinkText());

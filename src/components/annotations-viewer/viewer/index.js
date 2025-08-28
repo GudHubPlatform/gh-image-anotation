@@ -22,7 +22,13 @@ document.getElementById('cancelBtn').addEventListener('click', () => {
 
 document.getElementById('finalSaveBtn').addEventListener('click', () => {
   const json = editor.canvas.toJSON();
-  const dataUrl = editor.canvas.toDataURL({ format: 'png' });
+  const dataUrl = editor.canvas.toDataURL({
+    format: "png",
+    quality: 1,
+    width: 1920,
+    height: 1080,
+    multiplier: 1
+  });
 
   if (currentSlideIndex !== -1) {
     slides[currentSlideIndex].canvasJSON = json;

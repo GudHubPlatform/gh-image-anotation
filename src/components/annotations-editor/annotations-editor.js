@@ -135,7 +135,13 @@ class GhAnnotationsEditor extends HTMLElement {
 
         this.querySelector('#finalSaveBtn')?.addEventListener('click', () => {
             const json = this.editor.canvas.toJSON();
-            const dataUrl = this.editor.canvas.toDataURL({ format: 'png' });
+            const dataUrl = this.editor.canvas.toDataURL({
+                format: "png",
+                quality: 1,
+                width: 1920,
+                height: 1080,
+                multiplier: 1
+            });
 
             try {
                 this._initialCanvasJSON = JSON.stringify(json);

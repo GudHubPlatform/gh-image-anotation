@@ -84,6 +84,8 @@ export default class PaintEditor {
         }
 
         this.setupActiveToolHighlighting();
+
+        window.addEventListener('resize', () => this.resizeCanvasContainer());
     }
 
     initSinglePage() {
@@ -107,6 +109,7 @@ export default class PaintEditor {
 
         pageWrapper.style.display = 'block';
         this.setCanvas(canvas);
+        this.resizeCanvasContainer();
         this.currentPageIndex = 0;
         canvas.renderAll();
 
@@ -161,6 +164,28 @@ export default class PaintEditor {
 
     saveImage() { 
         saveImage(this); 
+    }
+
+    resizeCanvasContainer() {
+        const canvasElements = this.root.querySelectorAll('canvas');
+        const canvasContainer = this.root.querySelector('.canvas-container');
+        if (!canvasContainer) return;
+
+        const originalWidth = 1920;
+        const originalHeight = 1080;
+        const windowWidth = window.innerWidth;
+
+        const scale = windowWidth / originalWidth;
+        const newWidth = originalWidth * scale;
+        const newHeight = originalHeight * scale;
+
+        canvasElements.forEach((el) => {
+            el.style.height = `${newHeight}px`;
+            el.style.width = `${newWidth}px`;
+        });
+
+        canvasContainer.style.width = `${newWidth}px`;
+        canvasContainer.style.height = `${newHeight}px`;
     }
 
     updateActiveObjectColor(color) {
