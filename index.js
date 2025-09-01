@@ -18,10 +18,9 @@ export default class GhImageAnnotation {
                 field_value: '',
                 data_type: 'image_annotation',
                 data_model: {
-                    watch: {
-                        app_id: null,
-                        field_id: null
-                    },
+                    images_app_id: null,
+                    images_item_id: null,
+                    images_field_id: null,
                     interpretation: [
                         {
                             src: 'form',
@@ -46,15 +45,20 @@ export default class GhImageAnnotation {
             {
                 id: 'default',
                 name: 'Default',
-                content: () =>
-                    '<gh-image-annotation app-id="{{appId}}" item-id="{{itemId}}" field-id="{{fieldId}}"></gh-image-annotation>',
+                content: () => `
+                    <gh-image-annotation 
+                        app-id="{{field_model.data_model.images_app_id}}"
+                        item-id="{{field_model.data_model.images_item_id}}" 
+                        field-id="{{field_model.data_model.images_field_id}}"
+                    ></gh-image-annotation>
+                `,
             },
         ];
     }
 
     /*--------------------------  SETTINGS --------------------------------*/
 
-    getSettings() {
+    getSettings(scope) {
         return [
             {
                 title: 'Options',
@@ -63,19 +67,18 @@ export default class GhImageAnnotation {
                 columns_list: [
                     [
                         {
-                            title: 'Image Source',
+                            title: 'Images Source',
                             type: 'header',
                         },
                         {
                             type: 'ghElement',
-                            property: 'data_model.watch.app_id',
-                            data_model: function (fieldModel) {
+                            property: 'data_model.images_app_id',
+                            data_model() {
                                 return {
-                                    field_name: 'Application with images',
                                     data_type: 'app',
-                                    name_space: 'application',
+                                    field_name: 'Images App ID',
+                                    name_space: 'images_app_id',
                                     data_model: {
-                                        current_app: false,
                                         interpretation: [
                                             {
                                                 src: 'form',
@@ -93,21 +96,75 @@ export default class GhImageAnnotation {
                         },
                         {
                             type: 'ghElement',
-                            property: 'data_model.watch.field_id',
-                            data_model: function (fieldModel, appId) {
+                            property: 'data_model.images_field_id',
+                            onInit(settingScope, fieldModel) {
+                                settingScope.$watch(
+                                    () => fieldModel.data_model.images_app_id,
+                                    (newValue) => {
+                                        settingScope.field_model.data_model.app_id = newValue;
+                                    }
+                                );
+                            },
+                            data_model(fieldModel) {
                                 return {
-                                    data_model: {
-                                        app_id: appId,
-                                    },
-                                    field_name: 'Field with images',
-                                    name_space: 'field_with_images',
                                     data_type: 'field',
+                                    field_name: 'Images Field ID',
+                                    name_space: 'images_field_id',
+                                    data_model: {
+                                        app_id: fieldModel.data_model.images_app_id,
+                                    },
                                 };
                             },
                         },
-                    ],
-                ],
-            },
+                        {
+                            type: 'ghElement',
+                            property: 'data_model.images_item_id',
+                            onInit(settingScope, fieldModel) {
+                                settingScope.$watch(
+                                    () => fieldModel.data_model.images_app_id,
+                                    (newValue) => {
+                                        settingScope.field_model.data_model.refs[0].app_id = newValue;
+                                    }
+                                );
+                                settingScope.$watch(
+                                    () => fieldModel.data_model.images_field_id,
+                                    (newValue) => {
+                                        settingScope.field_model.data_model.refs[0].field_id = newValue;
+                                    }
+                                );
+                            },
+                            data_model(fieldModel) {
+                                return {
+                                    field_name: 'Images Item ID',
+                                    name_space: 'images_item_id',
+                                    data_type: 'item_ref',
+                                    data_model: {
+                                        refs: [
+                                            {
+                                                app_id: fieldModel.data_model.images_app_id,
+                                                field_id: fieldModel.data_model.images_field_id,
+                                                filters_list: [],
+                                                settings: {},
+                                            },
+                                        ],
+                                        interpretation: [
+                                            {
+                                                src: 'form',
+                                                id: 'input_with_name',
+                                                settings: {
+                                                    editable: 1,
+                                                    show_field_name: 1,
+                                                    show_field: 1,
+                                                }
+                                            }
+                                        ]
+                                    }
+                                };
+                            }
+                        }
+                    ]
+                ]
+            }
         ];
     }
 }

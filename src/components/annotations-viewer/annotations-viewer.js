@@ -27,13 +27,21 @@ class GhAnnotationsViewer extends HTMLElement {
     const editBtn = this.querySelector('#editBtn');
 
     const appId = this.getAttribute('data-app-id');
-    // const fieldId = this.getAttribute('data-field-id');
+    const itemId = this.getAttribute('data-item-id')?.split('.')[1];
+    const fieldId = this.getAttribute('data-field-id');
+    
     const storageKey = this.getAttribute('storage-key') || 'slides';
 
     if (appId) {
       try {
-        const gudHubApp = await gudhub.getApp(appId);
-        const imagesUrl = gudHubApp?.file_list?.map(file => file?.url);
+        const gudhubImagesFieldValue = await gudhub.getFieldValue(appId, itemId, fieldId);
+        const idsArray = gudhubImagesFieldValue
+          .split(",")
+          .map(id => id.trim())
+          .filter(Boolean);
+
+        const gudhubImagesDataFiles = await gudhub.getFiles(appId, idsArray);
+        const imagesUrl = gudhubImagesDataFiles?.map(file => file?.url);
 
         const slides = imagesUrl.map((url, i) => ({
           id: `slide-${Date.now()}-${i}`,
