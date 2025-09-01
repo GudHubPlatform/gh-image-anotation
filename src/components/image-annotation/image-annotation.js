@@ -38,14 +38,14 @@ class GhImageAnnotation extends GhHtmlElement {
     });
 
     editorEl.addEventListener('editor:save', (e) => {
-      const { json, dataUrl, currentSlideIndex, storageKey } = e.detail;
-      const slides = JSON.parse(localStorage.getItem(storageKey || 'slides') || '[]');
+      // const { json, dataUrl, currentSlideIndex, storageKey } = e.detail;
+      // const slides = JSON.parse(localStorage.getItem(storageKey || 'slides') || '[]');
 
-      if (currentSlideIndex !== -1) {
-        slides[currentSlideIndex].canvasJSON = json;
-        slides[currentSlideIndex].previewDataUrl = dataUrl;
-        localStorage.setItem(storageKey || 'slides', JSON.stringify(slides));
-      }
+      // if (currentSlideIndex !== -1) {
+      //   slides[currentSlideIndex].canvasJSON = json;
+      //   slides[currentSlideIndex].previewDataUrl = dataUrl;
+      //   localStorage.setItem(storageKey || 'slides', JSON.stringify(slides));
+      // }
 
       this.showViewer();
       this.querySelector('gh-annotations-viewer').refreshSlides();

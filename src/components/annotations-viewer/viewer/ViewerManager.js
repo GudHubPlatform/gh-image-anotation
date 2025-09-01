@@ -1,14 +1,16 @@
 import { renderPreview, renderSlides } from './ViewerPreview.js';
 
 export class ViewerManager {
-  constructor({ slideList, previewWrapper, editBtn, onSlideSelect, onSlideEdit, storageKey }) {
+  constructor({ slideList, previewWrapper, editBtn, onSlideSelect, onSlideEdit, storageKey, slidesService, initialSlidesMeta }) {
     this.slideList = slideList;
     this.previewWrapper = previewWrapper;
     this.editBtn = editBtn;
     this.onSlideSelect = onSlideSelect;
     this.onSlideEdit = onSlideEdit;
     this.storageKey = storageKey || 'slides';
-    this.slides = this.loadSlides();
+    // this.slides = this.loadSlides();
+    this.svc = slidesService;
+    this.slides = Array.isArray(initialSlidesMeta) ? initialSlidesMeta : [];
     this.selectedSlide = null;
     this.renderSlides();
 
@@ -19,14 +21,19 @@ export class ViewerManager {
     }
   }
 
-  saveSlides() {
-    localStorage.setItem(this.storageKey, JSON.stringify(this.slides));
+  // saveSlides() {
+  //   localStorage.setItem(this.storageKey, JSON.stringify(this.slides));
+  // }
+
+  async _persistIndex() { 
+    await this.svc.saveIndex(this.slides); 
   }
 
   addSlide() {
     const newSlide = this.createSlide();
     this.slides.push(newSlide);
-    this.saveSlides();
+    // this.saveSlides();
+    this._persistIndex();
     this.renderSlides();
     if (this.slides.length === 1) {
       this.selectSlide(newSlide.id);
@@ -36,7 +43,9 @@ export class ViewerManager {
 
   deleteSlide(id) {
     this.slides = this.slides.filter(slide => slide.id !== id);
-    this.saveSlides();
+    // this.saveSlides();
+    this._persistIndex();
+    this.svc.softDelete(id);
     this.renderSlides();
     if (this.selectedSlide?.id === id) {
       if (this.slides.length > 0) {
@@ -59,7 +68,15 @@ export class ViewerManager {
     };
 
     this.slides.splice(originalIndex + 1, 0, copy);
-    this.saveSlides();
+    // this.saveSlides();
+
+    this._persistIndex();
+    
+    this.svc.getSlide(id).then(full => {
+      const copyFull = { ...copy, canvasJSON: full?.canvasJSON ?? null };
+      return this.svc.upsertSlide(copyFull);
+    }).catch(() => {});
+
     this.renderSlides();
 
     return copy;
@@ -113,21 +130,21 @@ export class ViewerManager {
     });
   }
 
-  loadSlides() {
-    return JSON.parse(localStorage.getItem(this.storageKey) || '[]');
-  }
+  // loadSlides() {
+  //   return JSON.parse(localStorage.getItem(this.storageKey) || '[]');
+  // }
 
   createSlide() {
     return {
       id: 'slide-' + Date.now(),
       name: 'Slide',
-      canvasJSON: null,
+      // canvasJSON: null,
       previewDataUrl: null
     };
   }
 
   renderSlides() {
-    this.slides = this.loadSlides();
+    // this.slides = this.loadSlides();
     this.slideList.innerHTML = '';
     this.slides.forEach(slide => {
       const slideEl = renderPreview(slide, {
