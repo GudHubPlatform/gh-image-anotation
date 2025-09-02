@@ -40,67 +40,73 @@ class GhAnnotationsViewer extends HTMLElement {
 
     const slidesService = new SlidesServiceDM({ appId, fieldId, itemId });
 
-    if (appId) {
+    try {
+      let current = await slidesService.loadIndex();
+      current = Array.isArray(current) ? current : [];
+
+      let images = [];
       try {
-        // const gudhubImagesFieldValue = await gudhub.getFieldValue(appId, itemId, fieldId);
-        // const idsArray = gudhubImagesFieldValue
-        //   .split(",")
-        //   .map(id => id.trim())
-        //   .filter(Boolean);
+        const gudhubImagesFieldValue = await gudhub.getFieldValue(appId, itemId, fieldId);
+        const idsArray = (gudhubImagesFieldValue || '')
+          .split(',')
+          .map(id => id.trim())
+          .filter(Boolean);
 
-        // const gudhubImagesDataFiles = await gudhub.getFiles(appId, idsArray);
-        // const imagesUrl = gudhubImagesDataFiles?.map(file => file?.url);
-
-        // const slides = imagesUrl.map((url, i) => ({
-        //   id: `slide-${Date.now()}-${i}`,
-        //   name: `Slide ${i + 1}`,
-        //   canvasJSON: null,
-        //   previewDataUrl: url,
-        //   bgUrl: url
-        // })).filter(s => !!s.bgUrl);
-
-        // if (slides.length) {
-        //   localStorage.setItem(storageKey, JSON.stringify(slides));
-        // }
-
-        const current = await slidesService.loadIndex();
-        if (!current.length) {
-          try {
-            const gudhubImagesFieldValue = await gudhub.getFieldValue(appId, itemId, fieldId);
-            const idsArray = gudhubImagesFieldValue.split(",").map(id => id.trim()).filter(Boolean);
-            const gudhubImagesDataFiles = await gudhub.getFiles(appId, idsArray);
-            const imagesUrl = gudhubImagesDataFiles?.map(file => file?.url).filter(Boolean) || [];
-
-            const now = Date.now();
-            const boot = [];
-
-            for (let i = 0; i < imagesUrl.length; i++) {
-              const url = imagesUrl[i];
-              const id = `slide-${now}-${i}`;
-
-              const { previewDataUrl, canvasJSON } = await generateCanvasPreviewFromUrl(url, {
-                width: 1920, height: 1080, marginRatio: 0.10, background: null
-              });
-
-              await slidesService.upsertSlide({
-                id,
-                name: `Slide ${i + 1}`,
-                previewDataUrl,
-                bgUrl: url,
-                canvasJSON
-              });
-
-              boot.push({ id, name: `Slide ${i + 1}`, previewDataUrl, bgUrl: url });
-            }
-
-            if (boot.length) await slidesService.saveIndex(boot);
-          } catch (e) {
-            console.error('Failed to bootstrap slides from Gudhub:', e);
-          }
-        }
+        const gudhubFiles = await gudhub.getFiles(appId, idsArray);
+        images = (gudhubFiles || [])
+          .map(f => ({ fileId: String(f?.id), url: f?.url }))
+          .filter(x => !!x.fileId && !!x.url);
       } catch (e) {
-        console.error('Failed to bootstrap slides from Gudhub:', e);
+        console.error('Failed to fetch images from Gudhub:', e);
       }
+
+      const existingByFileId = new Map(
+        current
+          .filter(m => m.fileId)
+          .map(m => [String(m.fileId), m])
+      );
+
+      let toAdd = images.filter(x => !existingByFileId.has(String(x.fileId)));
+      if (current.length === 0 && images.length) {
+        toAdd = images.slice();
+      }
+
+      if (toAdd.length) {
+        const now = Date.now();
+        const base = current.length;
+
+        for (let i = 0; i < toAdd.length; i++) {
+          const { fileId, url } = toAdd[i];
+          const id = `slide-${now}-${i + 1}`;
+
+          const { previewDataUrl, canvasJSON } = await generateCanvasPreviewFromUrl(url, {
+            width: 1920,
+            height: 1080,
+            marginRatio: 0.10,
+            background: null
+          });
+
+          const meta = {
+            id,
+            name: `Slide ${base + i + 1}`,
+            previewDataUrl,
+            bgUrl: url,
+            fileId
+          };
+
+          await slidesService.upsertSlide({
+            ...meta,
+            canvasJSON,
+            schemaVersion: 1
+          });
+
+          current.push(meta);
+        }
+
+        await slidesService.replaceIndex(current);
+      }
+    } catch (e) {
+      console.error('Failed to bootstrap/sync slides from Gudhub:', e);
     }
 
     const initialSlidesMeta = await slidesService.loadIndex();

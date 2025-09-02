@@ -12,6 +12,23 @@ const DEFAULT_STATE = Object.freeze({
   slides: {}
 });
 
+function normalizeState(state) {
+  const idx = Array.isArray(state.index) ? state.index : [];
+  const keepIds = new Set(idx.filter(m => !m?.deleted).map(m => m.id));
+
+  const nextIndex = idx.filter(m => keepIds.has(m.id));
+  const srcSlides = state.slides || {};
+  const nextSlides = {};
+
+  for (const id of Object.keys(srcSlides)) {
+    if (keepIds.has(id)) nextSlides[id] = srcSlides[id];
+  }
+
+  state.index = nextIndex;
+  state.slides = nextSlides;
+  return state;
+}
+
 export class SlidesServiceDM {
   constructor({ appId, fieldId, itemId }) {
     if (!appId || !fieldId || !itemId) {
@@ -34,11 +51,12 @@ export class SlidesServiceDM {
   }
 
   async _writeState(state) {
+    const cleaned = normalizeState({ ...state });
     return gudhub.createDocument({
       app_id: this.appId,
       element_id: this.fieldId,
       item_id: this.itemId,
-      data: state
+      data: cleaned
     });
   }
 
@@ -48,6 +66,12 @@ export class SlidesServiceDM {
   }
 
   async saveIndex(slidesMeta) {
+    const s = await this._readState();
+    s.index = Array.isArray(slidesMeta) ? slidesMeta : [];
+    return this._writeState(s);
+  }
+
+  async replaceIndex(slidesMeta) {
     const s = await this._readState();
     s.index = Array.isArray(slidesMeta) ? slidesMeta : [];
     return this._writeState(s);
@@ -73,6 +97,13 @@ export class SlidesServiceDM {
     return this._writeState(s);
   }
 
+  async hardDelete(slideId) {
+    const s = await this._readState();
+    s.index = (s.index || []).filter(m => m.id !== slideId);
+    if (s.slides) delete s.slides[slideId];
+    return this._writeState(s);
+  }
+
   createEmptySlide() {
     return { id: 'slide-' + Date.now(), name: 'Slide', previewDataUrl: null, bgUrl: null };
   }
@@ -89,7 +120,11 @@ export class SlidesServiceDM {
         id: slide.id,
         name: slide.name ?? 'Slide',
         previewDataUrl: slide.previewDataUrl ?? null,
-        bgUrl: slide.bgUrl ?? null
+        bgUrl: slide.bgUrl ?? null,
+        ...(slide.fileId ? { fileId: slide.fileId } : {}),
+        ...(slide.isCopy ? { isCopy: true } : {}),
+        ...(slide.copyOf ? { copyOf: slide.copyOf } : {}),
+        ...(typeof slide.copyNumber === 'number' ? { copyNumber: slide.copyNumber } : {})
       };
       if (i === -1) idx.push(nextMeta);
       else idx[i] = { ...idx[i], ...nextMeta };

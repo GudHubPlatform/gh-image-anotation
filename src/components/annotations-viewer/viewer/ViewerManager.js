@@ -1,4 +1,4 @@
-import { renderPreview, renderSlides } from './ViewerPreview.js';
+import { renderPreview } from './ViewerPreview.js';
 
 export class ViewerManager {
   constructor({ slideList, previewWrapper, editBtn, onSlideSelect, onSlideEdit, storageKey, slidesService, initialSlidesMeta }) {
@@ -8,10 +8,11 @@ export class ViewerManager {
     this.onSlideSelect = onSlideSelect;
     this.onSlideEdit = onSlideEdit;
     this.storageKey = storageKey || 'slides';
-    // this.slides = this.loadSlides();
     this.svc = slidesService;
+
     this.slides = Array.isArray(initialSlidesMeta) ? initialSlidesMeta : [];
     this.selectedSlide = null;
+
     this.renderSlides();
 
     if (this.slides.length > 0) {
@@ -21,32 +22,32 @@ export class ViewerManager {
     }
   }
 
-  // saveSlides() {
-  //   localStorage.setItem(this.storageKey, JSON.stringify(this.slides));
-  // }
-
-  async _persistIndex() { 
-    await this.svc.saveIndex(this.slides); 
+  async _persistIndex() {
+    await this.svc.saveIndex(this.slides);
   }
 
   addSlide() {
     const newSlide = this.createSlide();
     this.slides.push(newSlide);
-    // this.saveSlides();
     this._persistIndex();
     this.renderSlides();
+
     if (this.slides.length === 1) {
       this.selectSlide(newSlide.id);
     }
     return newSlide;
   }
 
-  deleteSlide(id) {
+  async deleteSlide(id) {
     this.slides = this.slides.filter(slide => slide.id !== id);
-    // this.saveSlides();
-    this._persistIndex();
-    this.svc.softDelete(id);
+    await this._persistIndex();
+
+    try {
+      await this.svc.hardDelete(id);
+    } catch (_) {}
+
     this.renderSlides();
+
     if (this.selectedSlide?.id === id) {
       if (this.slides.length > 0) {
         this.selectSlide(this.slides[0].id);
@@ -61,30 +62,38 @@ export class ViewerManager {
     if (originalIndex === -1) return null;
 
     const original = this.slides[originalIndex];
+
+    const copies = this.slides.filter(s => s.copyOf === original.id);
+    const nextNum = copies.length + 1;
+
+    const baseName = (original.name || 'Slide').replace(/\s*- copy\s*\d+$/i, '');
+
     const copy = {
       ...original,
       id: 'slide-' + Date.now(),
-      name: original.name + ' (copy)'
+      name: `${baseName} - copy ${nextNum}`,
+      isCopy: true,
+      copyOf: original.id,
+      copyNumber: nextNum
     };
 
     this.slides.splice(originalIndex + 1, 0, copy);
-    // this.saveSlides();
 
     this._persistIndex();
-    
+
     this.svc.getSlide(id).then(full => {
       const copyFull = { ...copy, canvasJSON: full?.canvasJSON ?? null };
       return this.svc.upsertSlide(copyFull);
     }).catch(() => {});
 
     this.renderSlides();
-
     return copy;
   }
 
   selectSlide(id) {
     const slide = this.slides.find(s => s.id === id);
     if (!slide) return null;
+
     this.selectedSlide = slide;
     this.updateActiveSlideUI(id);
     this.showPreview(slide);
@@ -124,27 +133,21 @@ export class ViewerManager {
   }
 
   updateActiveSlideUI(activeId) {
-    const containers = this.slideList.querySelectorAll('.slide-preview-container');
+    const containers = this.slideList.querySelectorAll('.slide-preview-container, .sidebar__slide-preview-container');
     containers.forEach(el => {
       el.classList.toggle('active', el.dataset.id === activeId);
     });
   }
 
-  // loadSlides() {
-  //   return JSON.parse(localStorage.getItem(this.storageKey) || '[]');
-  // }
-
   createSlide() {
     return {
       id: 'slide-' + Date.now(),
       name: 'Slide',
-      // canvasJSON: null,
       previewDataUrl: null
     };
   }
 
   renderSlides() {
-    // this.slides = this.loadSlides();
     this.slideList.innerHTML = '';
     this.slides.forEach(slide => {
       const slideEl = renderPreview(slide, {
@@ -156,6 +159,7 @@ export class ViewerManager {
       slideEl.dataset.id = slide.id;
       this.slideList.appendChild(slideEl);
     });
+
     if (this.selectedSlide) {
       this.updateActiveSlideUI(this.selectedSlide.id);
     }
