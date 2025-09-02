@@ -1,6 +1,7 @@
 import html from './annotations-viewer.html';
 import styles from './annotations-viewer.scss';
 import { ViewerManager } from './viewer/ViewerManager.js';
+import { SlidesServiceDM } from '../../services/slidesServiceDM.js';
 
 class GhAnnotationsViewer extends HTMLElement {
   constructor() {
@@ -26,44 +27,74 @@ class GhAnnotationsViewer extends HTMLElement {
     const addSlideBtn = this.querySelector('#addSlideBtn');
     const editBtn = this.querySelector('#editBtn');
 
-    const appId = this.getAttribute('data-app-id');
-    const itemId = this.getAttribute('data-item-id')?.split('.')[1];
-    const fieldId = this.getAttribute('data-field-id');
-    
+    // const appId = this.getAttribute('data-app-id');
+    // const itemId = this.getAttribute('data-item-id')?.split('.')[1];
+    // const fieldId = this.getAttribute('data-field-id');
+
+    const appId = '36609';
+    const fieldId = '863613';
+    const itemId = '4368318';
+
     const storageKey = this.getAttribute('storage-key') || 'slides';
+
+    const slidesService = new SlidesServiceDM({ appId, fieldId, itemId });
 
     if (appId) {
       try {
-        const gudhubImagesFieldValue = await gudhub.getFieldValue(appId, itemId, fieldId);
-        const idsArray = gudhubImagesFieldValue
-          .split(",")
-          .map(id => id.trim())
-          .filter(Boolean);
+        // const gudhubImagesFieldValue = await gudhub.getFieldValue(appId, itemId, fieldId);
+        // const idsArray = gudhubImagesFieldValue
+        //   .split(",")
+        //   .map(id => id.trim())
+        //   .filter(Boolean);
 
-        const gudhubImagesDataFiles = await gudhub.getFiles(appId, idsArray);
-        const imagesUrl = gudhubImagesDataFiles?.map(file => file?.url);
+        // const gudhubImagesDataFiles = await gudhub.getFiles(appId, idsArray);
+        // const imagesUrl = gudhubImagesDataFiles?.map(file => file?.url);
 
-        const slides = imagesUrl.map((url, i) => ({
-          id: `slide-${Date.now()}-${i}`,
-          name: `Slide ${i + 1}`,
-          canvasJSON: null,
-          previewDataUrl: url,
-          bgUrl: url
-        })).filter(s => !!s.bgUrl);
+        // const slides = imagesUrl.map((url, i) => ({
+        //   id: `slide-${Date.now()}-${i}`,
+        //   name: `Slide ${i + 1}`,
+        //   canvasJSON: null,
+        //   previewDataUrl: url,
+        //   bgUrl: url
+        // })).filter(s => !!s.bgUrl);
 
-        if (slides.length) {
-          localStorage.setItem(storageKey, JSON.stringify(slides));
+        // if (slides.length) {
+        //   localStorage.setItem(storageKey, JSON.stringify(slides));
+        // }
+
+        const current = await slidesService.loadIndex();
+        if (!current.length) {
+          const gudhubImagesFieldValue = await gudhub.getFieldValue(appId, itemId, fieldId);
+          const idsArray = gudhubImagesFieldValue
+            .split(",")
+            .map(id => id.trim())
+            .filter(Boolean);
+
+          const gudhubImagesDataFiles = await gudhub.getFiles(appId, idsArray);
+          const imagesUrl = gudhubImagesDataFiles?.map(file => file?.url);
+
+          const boot = imagesUrl.map((url, i) => ({
+            id: `slide-${Date.now()}-${i}`,
+            name: `Slide ${i + 1}`,
+            previewDataUrl: url,
+            bgUrl: url
+          })).filter(s => !!s.bgUrl);
+
+          if (boot.length) await slidesService.saveIndex(boot);
         }
       } catch (e) {
         console.error('Failed to bootstrap slides from Gudhub:', e);
       }
     }
 
+    const initialSlidesMeta = await slidesService.loadIndex();
     this.manager = new ViewerManager({
       slideList,
       previewWrapper,
       editBtn,
       storageKey,
+      slidesService,
+      initialSlidesMeta,
       onSlideSelect: () => {},
       onSlideEdit: (slide) => {
         this.dispatchEvent(new CustomEvent('edit', {
