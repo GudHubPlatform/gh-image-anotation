@@ -48,7 +48,11 @@ class GhImageAnnotation extends GhHtmlElement {
       // }
 
       this.showViewer();
-      this.querySelector('gh-annotations-viewer').refreshSlides();
+      const viewer = this.querySelector('gh-annotations-viewer');
+      viewer?.refreshSlides({ select: slideId });
+
+      // this.showViewer();
+      // this.querySelector('gh-annotations-viewer').refreshSlides();
     });
 
     editorWrapper.appendChild(editorEl);

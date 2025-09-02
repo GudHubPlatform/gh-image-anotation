@@ -1,71 +1,101 @@
-const SCHEMA_VERSION = 1;
-
-function parseData(doc) {
+function parseDataSafe(doc) {
   const raw = doc?.data;
-  if (raw == null) return null;
-  return (typeof raw === 'string') ? JSON.parse(raw) : raw;
+  if (raw == null) return { index: [], slides: {} };
+  if (typeof raw === 'string') {
+    try { return JSON.parse(raw); } catch { return { index: [], slides: {} }; }
+  }
+  return raw;
 }
 
+const DEFAULT_STATE = Object.freeze({
+  index: [],
+  slides: {}
+});
+
 export class SlidesServiceDM {
-  /**
-   * @param {{ appId: string|number, fieldId: string|number, itemId: string|number }}
-   */
   constructor({ appId, fieldId, itemId }) {
-    if (!appId || !fieldId || !itemId) throw new Error('SlidesServiceDM: appId, fieldId, itemId are required');
-
-    this.appId = String(appId);
-    this.fieldId = String(fieldId);
-    this.itemId = String(itemId);
-  }
-
-  async _get() {
-    try {
-      const doc = await gudhub.getDocument({
-        app_id: this.appId, element_id: this.fieldId, item_id: this.itemId
-      });
-      return parseData(doc);
-    } catch {
-      return null;
+    if (!appId || !fieldId || !itemId) {
+      throw new Error('SlidesServiceDM: appId, fieldId, itemId are required');
     }
+    this.appId = parseInt(appId, 10);
+    this.fieldId = parseInt(fieldId, 10);
+    this.itemId = parseInt(itemId, 10);
   }
 
-  async _set(data) {
-    console.log("DATA:", data);
+  async _readState() {
+    const doc = await gudhub.getDocument({
+      app_id: this.appId,
+      element_id: this.fieldId,
+      item_id: this.itemId
+    }).catch(() => null);
 
+    const data = parseDataSafe(doc);
+    return { ...DEFAULT_STATE, ...data };
+  }
+
+  async _writeState(state) {
     return gudhub.createDocument({
-      app_id: this.appId, element_id: this.fieldId, item_id: this.itemId, data
-    })
+      app_id: this.appId,
+      element_id: this.fieldId,
+      item_id: this.itemId,
+      data: state
+    });
   }
 
   async loadIndex() {
-    const arr = await this._get();
-    return Array.isArray(arr) ? arr : [];
+    const s = await this._readState();
+    return s.index;
   }
 
   async saveIndex(slidesMeta) {
-    return this._set(slidesMeta);
+    const s = await this._readState();
+    s.index = Array.isArray(slidesMeta) ? slidesMeta : [];
+    return this._writeState(s);
   }
 
   async getSlide(slideId) {
-    const s = await this._get(slideId);
-    if (!s) return null;
-    if (!('schemaVersion' in s)) s.schemaVersion = SCHEMA_VERSION;
-    return s;
+    const s = await this._readState();
+    return s.slides?.[slideId] || null;
   }
 
   async upsertSlide(slide) {
-    const safe = { schemaVersion: SCHEMA_VERSION, ...slide };
-    return this._set(slide.id, safe);
+    const s = await this._readState();
+    if (!s.slides) s.slides = {};
+    s.slides[slide.id] = { ...(s.slides[slide.id] || {}), ...slide };
+    return this._writeState(s);
   }
 
   async softDelete(slideId) {
-    const idx = await this.loadIndex();
-    const next = idx.filter(s => s.id !== slideId);
-    await this.saveIndex(next);
-    await this.upsertSlide({ id: slideId, deleted: true });
+    const s = await this._readState();
+    s.index = (s.index || []).filter(m => m.id !== slideId);
+    if (!s.slides) s.slides = {};
+    s.slides[slideId] = { ...(s.slides[slideId] || {}), id: slideId, deleted: true };
+    return this._writeState(s);
   }
 
   createEmptySlide() {
     return { id: 'slide-' + Date.now(), name: 'Slide', previewDataUrl: null, bgUrl: null };
+  }
+
+  async saveSlideAndIndex({ slide, updateMeta }) {
+    const s = await this._readState();
+    if (!s.slides) s.slides = {};
+    s.slides[slide.id] = { ...(s.slides[slide.id] || {}), ...slide };
+
+    if (updateMeta) {
+      const idx = Array.isArray(s.index) ? s.index : [];
+      const i = idx.findIndex(m => m.id === slide.id);
+      const nextMeta = {
+        id: slide.id,
+        name: slide.name ?? 'Slide',
+        previewDataUrl: slide.previewDataUrl ?? null,
+        bgUrl: slide.bgUrl ?? null
+      };
+      if (i === -1) idx.push(nextMeta);
+      else idx[i] = { ...idx[i], ...nextMeta };
+      s.index = idx;
+    }
+
+    return this._writeState(s);
   }
 }

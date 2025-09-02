@@ -2,6 +2,7 @@ import html from './annotations-viewer.html';
 import styles from './annotations-viewer.scss';
 import { ViewerManager } from './viewer/ViewerManager.js';
 import { SlidesServiceDM } from '../../services/slidesServiceDM.js';
+import { generateCanvasPreviewFromUrl } from '../../lib/generateCanvasPreviewFromUrl.js';
 
 class GhAnnotationsViewer extends HTMLElement {
   constructor() {
@@ -64,23 +65,38 @@ class GhAnnotationsViewer extends HTMLElement {
 
         const current = await slidesService.loadIndex();
         if (!current.length) {
-          const gudhubImagesFieldValue = await gudhub.getFieldValue(appId, itemId, fieldId);
-          const idsArray = gudhubImagesFieldValue
-            .split(",")
-            .map(id => id.trim())
-            .filter(Boolean);
+          try {
+            const gudhubImagesFieldValue = await gudhub.getFieldValue(appId, itemId, fieldId);
+            const idsArray = gudhubImagesFieldValue.split(",").map(id => id.trim()).filter(Boolean);
+            const gudhubImagesDataFiles = await gudhub.getFiles(appId, idsArray);
+            const imagesUrl = gudhubImagesDataFiles?.map(file => file?.url).filter(Boolean) || [];
 
-          const gudhubImagesDataFiles = await gudhub.getFiles(appId, idsArray);
-          const imagesUrl = gudhubImagesDataFiles?.map(file => file?.url);
+            const now = Date.now();
+            const boot = [];
 
-          const boot = imagesUrl.map((url, i) => ({
-            id: `slide-${Date.now()}-${i}`,
-            name: `Slide ${i + 1}`,
-            previewDataUrl: url,
-            bgUrl: url
-          })).filter(s => !!s.bgUrl);
+            for (let i = 0; i < imagesUrl.length; i++) {
+              const url = imagesUrl[i];
+              const id = `slide-${now}-${i}`;
 
-          if (boot.length) await slidesService.saveIndex(boot);
+              const { previewDataUrl, canvasJSON } = await generateCanvasPreviewFromUrl(url, {
+                width: 1920, height: 1080, marginRatio: 0.10, background: null
+              });
+
+              await slidesService.upsertSlide({
+                id,
+                name: `Slide ${i + 1}`,
+                previewDataUrl,
+                bgUrl: url,
+                canvasJSON
+              });
+
+              boot.push({ id, name: `Slide ${i + 1}`, previewDataUrl, bgUrl: url });
+            }
+
+            if (boot.length) await slidesService.saveIndex(boot);
+          } catch (e) {
+            console.error('Failed to bootstrap slides from Gudhub:', e);
+          }
         }
       } catch (e) {
         console.error('Failed to bootstrap slides from Gudhub:', e);
@@ -108,8 +124,13 @@ class GhAnnotationsViewer extends HTMLElement {
     addSlideBtn?.addEventListener('click', () => this.manager.addSlide());
   }
 
-  refreshSlides() {
+  async refreshSlides({ select } = {}) {
+    const freshMeta = await this.manager.svc.loadIndex();
+    this.manager.slides = Array.isArray(freshMeta) ? freshMeta : [];
     this.manager.renderSlides();
+
+    const keep = select || this.manager.selectedSlide?.id || this.manager.slides[0]?.id;
+    if (keep) this.manager.selectSlide(keep);
   }
 }
 
