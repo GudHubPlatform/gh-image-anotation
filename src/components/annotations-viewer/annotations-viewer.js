@@ -8,6 +8,11 @@ class GhAnnotationsViewer extends HTMLElement {
   constructor() {
     super();
     this.manager = null;
+    this._syncInFlight = false;
+
+    this._appId = null;
+    this._fieldId = null;
+    this._itemId = null;
   }
 
   connectedCallback() {
@@ -22,24 +27,9 @@ class GhAnnotationsViewer extends HTMLElement {
     `;
   }
 
-  async init() {
-    const slideList = this.querySelector('#slideList');
-    const previewWrapper = this.querySelector('#previewWrapper');
-    const addSlideBtn = this.querySelector('#addSlideBtn');
-    const editBtn = this.querySelector('#editBtn');
-
-    // const appId = this.getAttribute('data-app-id');
-    // const itemId = this.getAttribute('data-item-id')?.split('.')[1];
-    // const fieldId = this.getAttribute('data-field-id');
-
-    const appId = '36609';
-    const fieldId = '863613';
-    const itemId = '4368318';
-
-    const storageKey = this.getAttribute('storage-key') || 'slides';
-
-    const slidesService = new SlidesServiceDM({ appId, fieldId, itemId });
-
+  async _syncWithGudhub(slidesService, { appId, itemId, fieldId }) {
+    if (this._syncInFlight) return;
+    this._syncInFlight = true;
     try {
       let current = await slidesService.loadIndex();
       current = Array.isArray(current) ? current : [];
@@ -106,8 +96,35 @@ class GhAnnotationsViewer extends HTMLElement {
         await slidesService.replaceIndex(current);
       }
     } catch (e) {
-      console.error('Failed to bootstrap/sync slides from Gudhub:', e);
+      console.error('Sync failed:', e);
+    } finally {
+      this._syncInFlight = false;
     }
+  }
+
+  async init() {
+    const slideList = this.querySelector('#slideList');
+    const previewWrapper = this.querySelector('#previewWrapper');
+    const addSlideBtn = this.querySelector('#addSlideBtn');
+    const editBtn = this.querySelector('#editBtn');
+
+    // const appId = this.getAttribute('data-app-id');
+    // const itemId = this.getAttribute('data-item-id')?.split('.')[1];
+    // const fieldId = this.getAttribute('data-field-id');
+
+    const appId = '36609';
+    const fieldId = '863613';
+    const itemId = '4368318';
+
+    this._appId = appId;
+    this._fieldId = fieldId;
+    this._itemId = itemId;
+
+    const storageKey = this.getAttribute('storage-key') || 'slides';
+
+    const slidesService = new SlidesServiceDM({ appId, fieldId, itemId });
+
+    await this._syncWithGudhub(slidesService, { appId, itemId, fieldId });
 
     const initialSlidesMeta = await slidesService.loadIndex();
     this.manager = new ViewerManager({
@@ -131,6 +148,12 @@ class GhAnnotationsViewer extends HTMLElement {
   }
 
   async refreshSlides({ select } = {}) {
+    await this._syncWithGudhub(this.manager.svc, {
+      appId: this._appId,
+      itemId: this._itemId,
+      fieldId: this._fieldId
+    });
+
     const freshMeta = await this.manager.svc.loadIndex();
     this.manager.slides = Array.isArray(freshMeta) ? freshMeta : [];
     this.manager.renderSlides();

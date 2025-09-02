@@ -90,14 +90,7 @@ class GhAnnotationsEditor extends HTMLElement {
     }
 
     init() {
-        // const slideId = this.getAttribute('slide-id');
-        // const storageKey = this.getAttribute('storage-key') || 'slides';
-
-        // let slides = JSON.parse(localStorage.getItem(storageKey) || '[]');
-        // this.currentSlideIndex = slides.findIndex(s => s.id === slideId);
-
         const slideId = this.getAttribute('slide-id');
-        // const storageKey = this.getAttribute('storage-key') || 'slides';
         const appId = '36609';
         const fieldId = '863613';
         const itemId = '4368318';
@@ -111,34 +104,6 @@ class GhAnnotationsEditor extends HTMLElement {
         });
 
         this.editor = new PaintEditor(this);
-
-        // if (this.currentSlideIndex !== -1) {
-        //     const slide = slides[this.currentSlideIndex];
-
-        //     if (slide.canvasJSON) {
-        //         this.editor.isRestoring = true;
-        //         this.editor.canvas.loadFromJSON(slide.canvasJSON, () => {
-        //             this.editor.canvas.renderAll();
-        //             this.editor.isRestoring = false;
-        //             resetHistory(this.editor);
-        //             this._captureInitial();
-        //         });
-        //     } else if (slide.bgUrl && typeof this.editor.setBackgroundImageFromURL === 'function') {
-        //         this.editor.setBackgroundImageFromURL(slide.bgUrl);
-        //         resetHistory(this.editor);
-        //         const once = () => {
-        //             this.editor.canvas.off('after:render', once);
-        //             this._captureInitial();
-        //         };
-        //         this.editor.canvas.on('after:render', once);
-        //     } else {
-        //         resetHistory(this.editor);
-        //         setTimeout(() => this._captureInitial(), 0);
-        //     }
-        // } else {
-        //     resetHistory(this.editor);
-        //     setTimeout(() => this._captureInitial(), 0);
-        // }
 
         initPromise.then(async () => {
             if (this.currentSlideIndex !== -1) {
@@ -179,35 +144,47 @@ class GhAnnotationsEditor extends HTMLElement {
             this.dispatchEvent(new CustomEvent('editor:cancel', { bubbles: true, composed: true }));
         });
 
+        this._saving = false;
+
         this.querySelector('#finalSaveBtn')?.addEventListener('click', async () => {
-            const json = this.editor.canvas.toJSON();
-            const dataUrl = this.editor.canvas.toDataURL({
+            if (this._saving) return; 
+            this._saving = true;
+            const btn = this.querySelector('#finalSaveBtn');
+            const cancelBtn = this.querySelector('#cancelBtn');
+            btn?.setAttribute('disabled', 'true');
+            cancelBtn?.setAttribute('disabled', 'true');
+
+            try {
+                const json = this.editor.canvas.toJSON();
+                const dataUrl = this.editor.canvas.toDataURL({
                 format: "png",
                 quality: 1,
                 width: 1920,
                 height: 1080,
                 multiplier: 1
-            });
+                });
 
-            try {
-                this._initialCanvasJSON = JSON.stringify(json);
-            } catch {}
+                try { this._initialCanvasJSON = JSON.stringify(json); } catch {}
 
-            // this.dispatchEvent(new CustomEvent('editor:save', {
-            //     bubbles: true,
-            //     composed: true,
-            //     detail: { json, dataUrl, currentSlideIndex: this.currentSlideIndex, storageKey }
-            // }));
-
-            const slides = await this.svc.loadIndex();
-            if (this.currentSlideIndex !== -1) {
+                const slides = await this.svc.loadIndex();
+                if (this.currentSlideIndex !== -1) {
                 const meta = slides[this.currentSlideIndex];
-                slides[this.currentSlideIndex] = { ...meta, previewDataUrl: dataUrl };
-                await this.svc.upsertSlide({ ...meta, previewDataUrl: dataUrl, canvasJSON: json });
-                await this.svc.saveIndex(slides);
-            }
+                const updated = { ...meta, previewDataUrl: dataUrl, canvasJSON: json };
 
-            this.dispatchEvent(new CustomEvent('editor:save', { bubbles: true, composed: true }));
+                await this.svc.saveSlideAndIndex({
+                    slide: updated,
+                    updateMeta: true
+                });
+                }
+
+                this.dispatchEvent(new CustomEvent('editor:save', { bubbles: true, composed: true }));
+            } catch (e) {
+                console.error('Save failed:', e);
+            } finally {
+                this._saving = false;
+                btn?.removeAttribute('disabled');
+                cancelBtn?.removeAttribute('disabled');
+            }
         });
     }
 }
