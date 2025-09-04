@@ -1,5 +1,9 @@
+// viewer/ViewerManager.js
 import { renderPreview } from './ViewerPreview.js';
-import { generateCanvasPreviewFromUrl, generateCanvasPreviewFromJSON } from '../../../lib/generateCanvasPreviewFromUrl.js';
+import {
+  generateCanvasPreviewFromUrl,
+  generateCanvasPreviewFromJSON
+} from '../../../lib/generateCanvasPreviewFromUrl.js';
 
 function isCopySlide(slide) {
   return !!(slide?.isCopy || slide?.copyOf);
@@ -16,7 +20,16 @@ function isEmptySlide(slide) {
 }
 
 export class ViewerManager {
-  constructor({ slideList, previewWrapper, editBtn, onSlideSelect, onSlideEdit, storageKey, slidesService, initialSlidesMeta }) {
+  constructor({
+    slideList,
+    previewWrapper,
+    editBtn,
+    onSlideSelect,
+    onSlideEdit,
+    storageKey,
+    slidesService,
+    initialSlidesMeta
+  }) {
     this.slideList = slideList;
     this.previewWrapper = previewWrapper;
     this.editBtn = editBtn;
@@ -118,17 +131,33 @@ export class ViewerManager {
     return slide;
   }
 
+  /** Отримати dataURL для превʼю на основі даних документа */
+  async getPreviewDataUrl(slide) {
+    try {
+      if (slide?.canvasJSON) {
+        const { previewDataUrl } = await generateCanvasPreviewFromJSON(
+          slide.canvasJSON,
+          { width: 1920, height: 1080 }
+        );
+        return previewDataUrl;
+      }
+      if (slide?.bgUrl) {
+        const { previewDataUrl } = await generateCanvasPreviewFromUrl(
+          slide.bgUrl,
+          { width: 1920, height: 1080, marginRatio: 0.10, background: null }
+        );
+        return previewDataUrl;
+      }
+    } catch (e) {
+      console.error('Thumb render failed:', e);
+    }
+    return null;
+  }
+
   async showPreview(slide) {
     this.previewWrapper.innerHTML = '';
     try {
-      let dataUrl = null;
-      if (slide.canvasJSON) {
-        const { previewDataUrl } = await generateCanvasPreviewFromJSON(slide.canvasJSON, { width: 1920, height: 1080 });
-        dataUrl = previewDataUrl;
-      } else if (slide.bgUrl) {
-        const { previewDataUrl } = await generateCanvasPreviewFromUrl(slide.bgUrl, { width: 1920, height: 1080, marginRatio: 0.10, background: null });
-        dataUrl = previewDataUrl;
-      }
+      const dataUrl = await this.getPreviewDataUrl(slide);
       if (dataUrl) {
         const img = document.createElement('img');
         img.src = dataUrl;
@@ -154,16 +183,24 @@ export class ViewerManager {
 
   createSlide() { return { id: 'slide-' + Date.now(), name: 'Slide', bgUrl: null, canvasJSON: null }; }
 
+  /** Рендер списку слайдів з підвантаженням мініатюр */
   renderSlides() {
     this.slideList.innerHTML = '';
-    this.slides.forEach(slide => {
+    this.slides.forEach(async (slide) => {
+      // спочатку створюємо картку без src — щоб UI зʼявився миттєво
       const slideEl = renderPreview(slide, {
         onDelete: () => this.deleteSlide(slide.id),
         onDuplicate: () => this.duplicateSlide(slide.id),
-        onSelect: () => this.selectSlide(slide.id)
+        onSelect: () => this.selectSlide(slide.id),
+        previewUrl: null
       });
       slideEl.dataset.id = slide.id;
       this.slideList.appendChild(slideEl);
+
+      // асинхронно підвантажуємо таке саме зображення, як у великому превʼю
+      const url = await this.getPreviewDataUrl(slide);
+      const img = slideEl.querySelector('img.sidebar__thumb');
+      if (img && url) img.src = url;
     });
     if (this.selectedSlide) this.updateActiveSlideUI(this.selectedSlide.id);
   }

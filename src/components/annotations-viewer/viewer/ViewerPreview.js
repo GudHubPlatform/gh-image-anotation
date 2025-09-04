@@ -1,3 +1,5 @@
+// viewer/ViewerPreview.js
+
 export function renderSlides(slides, container, getHandlers) {
   container.innerHTML = '';
   slides.forEach(slide => {
@@ -12,12 +14,12 @@ function isCopySlide(slide) {
   return !!(slide?.isCopy || slide?.copyOf);
 }
 
-/** Вирахувати, чи слайд порожній (ручний “+”, нічого не збережено) */
+/** Вирахувати, чи слайд порожній */
 function isEmptySlide(slide) {
   if (!slide) return false;
   if (slide.fileId || slide.bgUrl) return false;
   const json = slide.canvasJSON;
-  if (!json) return true; // взагалі нічого не збережено
+  if (!json) return true;
   try {
     const objs = Array.isArray(json.objects) ? json.objects : [];
     return objs.length === 0;
@@ -27,24 +29,28 @@ function isEmptySlide(slide) {
 }
 
 /**
- * Показує картку слайда в сайдбарі.
- * Мусорка відображається ТІЛЬКИ якщо (копія) АБО (порожній слайд).
+ * Картка слайда в сайдбарі:
+ * тепер показує тільки мініатюру + кнопки дій, без тексту.
  */
-export function renderPreview(slide, { onDelete, onDuplicate, onSelect }) {
+export function renderPreview(
+  slide,
+  { onDelete, onDuplicate, onSelect, previewUrl }
+) {
   const container = document.createElement('div');
   container.className = 'sidebar__slide-preview-container';
   container.dataset.id = slide.id;
-  console.log("CONTAINER DATASET ID:", container.dataset.id);
 
-  const title = document.createElement('div');
-  title.className = 'sidebar__slide-title';
-  title.textContent = slide.name || 'Slide';
-  container.appendChild(title);
+  // Мініатюра
+  const thumb = document.createElement('img');
+  thumb.className = 'sidebar__thumb';
+  if (previewUrl) thumb.src = previewUrl;
+  container.appendChild(thumb);
 
+  // Блок дій
   const btnWrapper = document.createElement('div');
   btnWrapper.className = 'sidebar__slide-actions slide-actions';
 
-  // Duplicate — завжди доступний
+  // Duplicate
   const duplicateBtn = document.createElement('div');
   duplicateBtn.className = 'slide-actions__duplicate-button';
   duplicateBtn.innerHTML = `
@@ -56,7 +62,7 @@ export function renderPreview(slide, { onDelete, onDuplicate, onSelect }) {
   duplicateBtn.addEventListener('click', (e) => { e.stopPropagation(); onDuplicate(); });
   btnWrapper.appendChild(duplicateBtn);
 
-  // Delete — лише для копій або порожніх
+  // Delete — тільки якщо копія або порожній
   if (isCopySlide(slide) || isEmptySlide(slide)) {
     const deleteBtn = document.createElement('div');
     deleteBtn.className = 'slide-actions__delete-button';
