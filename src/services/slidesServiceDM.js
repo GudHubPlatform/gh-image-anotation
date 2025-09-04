@@ -1,27 +1,19 @@
 // src/services/slidesServiceDM.js
 
-// -------- helpers ------------------------------------------------------------
-
 /**
  * Безпечно дістає state з документа GudHub і розпаковує "матрьошку",
- * якщо в data випадково поклали цілий "конверт" документа.
- * Повертає об'єкт виду: { index: [], slides: {} }
+ * якщо в data випадково поклали весь документ. Повертає { index: [], slides: {} }.
  */
 function parseDataSafe(doc) {
   let raw = doc?.data;
 
-  // Якщо бек повертає рядок — парсимо
   if (typeof raw === 'string') {
     try { raw = JSON.parse(raw); } catch { raw = null; }
   }
 
-  // РОЗПАКОВКА "КОНВЕРТІВ":
-  // Поки бачимо структуру типу { app_id?, element_id?, item_id?, data }, заходимо у data.
-  // Це виправляє ситуацію, коли в data випадково клали весь документ.
+  // Розпакування вкладених "конвертів"
   while (
-    raw &&
-    typeof raw === 'object' &&
-    raw.data &&
+    raw && typeof raw === 'object' && raw.data &&
     (Object.prototype.hasOwnProperty.call(raw, 'app_id') ||
      Object.prototype.hasOwnProperty.call(raw, 'element_id') ||
      Object.prototype.hasOwnProperty.call(raw, 'item_id'))
@@ -38,32 +30,22 @@ function parseDataSafe(doc) {
   return { index, slides };
 }
 
-const DEFAULT_STATE = Object.freeze({
-  index: [],
-  slides: {}
-});
+const DEFAULT_STATE = Object.freeze({ index: [], slides: {} });
 
-/**
- * Прибирає "мертві"/видалені елементи з state, щоб не роздувати документ.
- */
+/** Прибирає видалені елементи, щоб не роздувати документ. */
 function normalizeState(state) {
   const idx = Array.isArray(state.index) ? state.index : [];
   const keepIds = new Set(idx.filter(m => !m?.deleted).map(m => m.id));
 
-  const nextIndex = idx.filter(m => keepIds.has(m.id));
+  state.index = idx.filter(m => keepIds.has(m.id));
   const srcSlides = state.slides || {};
   const nextSlides = {};
-
   for (const id of Object.keys(srcSlides)) {
     if (keepIds.has(id)) nextSlides[id] = srcSlides[id];
   }
-
-  state.index = nextIndex;
   state.slides = nextSlides;
   return state;
 }
-
-// -------- service ------------------------------------------------------------
 
 export class SlidesServiceDM {
   constructor({ appId, fieldId, itemId }) {
@@ -74,10 +56,16 @@ export class SlidesServiceDM {
     this.fieldId = parseInt(fieldId, 10);
     this.itemId = parseInt(itemId, 10);
 
-    this.document = null;
+    // Проста серіалізація I/O-операцій (mutex через Promise)
+    this._op = Promise.resolve();
   }
 
-  // --- I/O з єдиним state-документом ----------------------------------------
+  _enqueue(fn) {
+    this._op = this._op.then(fn, fn);
+    return this._op;
+  }
+
+  // ---------------- low-level I/O з єдиним state-документом -----------------
 
   async _readState() {
     const doc = await gudhub.getDocument({
@@ -92,8 +80,6 @@ export class SlidesServiceDM {
 
   async _writeState(state) {
     const cleaned = normalizeState({ ...state });
-
-    // ВАЖЛИВО: у data — ТІЛЬКИ чистий state (index/slides), без обгорток
     return gudhub.createDocument({
       app_id: this.appId,
       element_id: this.fieldId,
@@ -102,24 +88,11 @@ export class SlidesServiceDM {
     });
   }
 
-  // --- API індексу/слайдів (сумісно з існуючим кодом) -----------------------
+  // ---------------- базові методи (зворотна сумісність) ---------------------
 
-  async loadIndex() {
-    const s = await this._readState();
-    return s.index;
-  }
-
-  async saveIndex(slidesMeta) {
-    const s = await this._readState();
-    s.index = Array.isArray(slidesMeta) ? slidesMeta : [];
-    return this._writeState(s);
-  }
-
-  async replaceIndex(slidesMeta) {
-    const s = await this._readState();
-    s.index = Array.isArray(slidesMeta) ? slidesMeta : [];
-    return this._writeState(s);
-  }
+  async loadIndex()       { return (await this._readState()).index; }
+  async replaceIndex(arr) { const s = await this._readState(); s.index = Array.isArray(arr) ? arr : []; return this._writeState(s); }
+  async saveIndex(arr)    { return this.replaceIndex(arr); }
 
   async getSlide(slideId) {
     const s = await this._readState();
@@ -130,12 +103,7 @@ export class SlidesServiceDM {
     const s = await this._readState();
     if (!s.slides) s.slides = {};
     const merged = { ...(s.slides[slide.id] || {}), ...slide };
-
-    // Не зберігаємо preview у state, якщо його не передали явно
-    if (!Object.prototype.hasOwnProperty.call(slide, 'previewDataUrl')) {
-      delete merged.previewDataUrl;
-    }
-
+    if (!Object.prototype.hasOwnProperty.call(slide, 'previewDataUrl')) delete merged.previewDataUrl;
     s.slides[slide.id] = merged;
     return this._writeState(s);
   }
@@ -159,56 +127,121 @@ export class SlidesServiceDM {
     return { id: 'slide-' + Date.now(), name: 'Slide', bgUrl: null, canvasJSON: null };
   }
 
-  /**
-   * Зберігає повний слайд і, за потреби, оновлює метадані в index.
-   * НЕ кладемо previewDataUrl у документ (якщо його не передали явно).
-   */
   async saveSlideAndIndex({ slide, updateMeta }) {
     const s = await this._readState();
     if (!s.slides) s.slides = {};
-
     const merged = { ...(s.slides[slide.id] || {}), ...slide };
-    if (!Object.prototype.hasOwnProperty.call(slide, 'previewDataUrl')) {
-      delete merged.previewDataUrl;
-    }
+    if (!Object.prototype.hasOwnProperty.call(slide, 'previewDataUrl')) delete merged.previewDataUrl;
     s.slides[slide.id] = merged;
 
     if (updateMeta) {
       const idx = Array.isArray(s.index) ? s.index : [];
       const i = idx.findIndex(m => m.id === slide.id);
-      const baseMeta = i === -1 ? {} : idx[i];
-
-      const nextMeta = {
+      const base = i === -1 ? {} : idx[i];
+      const next = {
         id: slide.id,
-        name: slide.name ?? baseMeta.name ?? 'Slide',
-        bgUrl: (Object.prototype.hasOwnProperty.call(slide, 'bgUrl') ? slide.bgUrl : baseMeta.bgUrl ?? null),
-        ...(slide.fileId ? { fileId: slide.fileId } : (baseMeta.fileId ? { fileId: baseMeta.fileId } : {})),
+        name: slide.name ?? base.name ?? 'Slide',
+        bgUrl: (Object.prototype.hasOwnProperty.call(slide, 'bgUrl') ? slide.bgUrl : base.bgUrl ?? null),
+        ...(slide.fileId ? { fileId: slide.fileId } : (base.fileId ? { fileId: base.fileId } : {})),
         ...(slide.isCopy ? { isCopy: true } : {}),
         ...(slide.copyOf ? { copyOf: slide.copyOf } : {}),
         ...(typeof slide.copyNumber === 'number' ? { copyNumber: slide.copyNumber } : {})
       };
-
-      if (i === -1) idx.push(nextMeta);
-      else idx[i] = { ...idx[i], ...nextMeta };
-
+      if (i === -1) idx.push(next); else idx[i] = { ...idx[i], ...next };
       s.index = idx;
     }
-
     return this._writeState(s);
   }
 
-  /**
-   * Повертає масив повних слайдів із одного state-документа
-   * (поєднує index і slides).
-   */
   async loadAllSlidesFromSingleDocument() {
     const s = await this._readState();
-    const index = Array.isArray(s.index) ? s.index : [];
+    const idx = Array.isArray(s.index) ? s.index : [];
     const out = [];
-    for (const meta of index) {
+    for (const meta of idx) {
       const full = s.slides?.[meta.id] || meta;
       if (full?.id) out.push(full);
     }
     return out;
+  }
+
+  // ---------------- нові transactional «write → read» -----------------------
+
+  async saveIndexThenReload(slidesMeta) {
+    return this._enqueue(async () => {
+      const s = await this._readState();
+      s.index = Array.isArray(slidesMeta) ? slidesMeta : [];
+      await this._writeState(s);      // create
+      return this._readState();       // get
+    });
+  }
+
+  async saveSlideAndIndexThenReload({ slide, updateMeta, insertAfterId }) {
+    return this._enqueue(async () => {
+      const s = await this._readState();
+      if (!s.slides) s.slides = {};
+
+      const merged = { ...(s.slides[slide.id] || {}), ...slide };
+      if (!Object.prototype.hasOwnProperty.call(slide, 'previewDataUrl')) {
+        delete merged.previewDataUrl;
+      }
+      s.slides[slide.id] = merged;
+
+      if (updateMeta) {
+        const idx = Array.isArray(s.index) ? s.index : [];
+        const i = idx.findIndex(m => m.id === slide.id);
+        const baseMeta = i === -1 ? {} : idx[i];
+
+        const nextMeta = {
+          id: slide.id,
+          name: slide.name ?? baseMeta.name ?? 'Slide',
+          bgUrl: (Object.prototype.hasOwnProperty.call(slide, 'bgUrl') ? slide.bgUrl : baseMeta.bgUrl ?? null),
+          ...(slide.fileId ? { fileId: slide.fileId } : (baseMeta.fileId ? { fileId: baseMeta.fileId } : {})),
+          ...(slide.isCopy ? { isCopy: true } : {}),
+          ...(slide.copyOf ? { copyOf: slide.copyOf } : {}),
+          ...(typeof slide.copyNumber === 'number' ? { copyNumber: slide.copyNumber } : {})
+        };
+
+        if (i === -1) {
+          // новий слайд: вставляємо відразу після insertAfterId (якщо задано)
+          if (insertAfterId) {
+            const pos = idx.findIndex(m => m.id === insertAfterId);
+            if (pos !== -1) idx.splice(pos + 1, 0, nextMeta);
+            else idx.push(nextMeta);
+          } else {
+            idx.push(nextMeta);
+          }
+        } else {
+          // оновлення існуючого
+          idx[i] = { ...idx[i], ...nextMeta };
+        }
+
+        s.index = idx;
+      }
+
+      await this._writeState(s);          // createDocument
+      return this._readState();           // getDocument
+    });
+  }
+
+  async hardDeleteThenReload(slideId) {
+    return this._enqueue(async () => {
+      const s = await this._readState();
+      s.index = (s.index || []).filter(m => m.id !== slideId);
+      if (s.slides) delete s.slides[slideId];
+      await this._writeState(s);      // create
+      return this._readState();       // get
+    });
+  }
+
+  /** Повністю замінити state одним create → get. */
+  async replaceStateThenReload({ index, slides }) {
+    return this._enqueue(async () => {
+      const next = {
+        index: Array.isArray(index) ? index : [],
+        slides: slides && typeof slides === 'object' ? slides : {}
+      };
+      await this._writeState(next);   // create
+      return this._readState();       // get
+    });
   }
 }

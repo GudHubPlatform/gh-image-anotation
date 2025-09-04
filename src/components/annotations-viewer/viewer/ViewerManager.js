@@ -46,25 +46,48 @@ export class ViewerManager {
     else this.showEmptyPreview();
   }
 
-  async _persistIndex() { await this.svc.saveIndex(this.slides); }
+  _buildMetaIndex() {
+    return this.slides.map(({ id, name, bgUrl, fileId, isCopy, copyOf, copyNumber }) => ({
+      id,
+      name: name ?? 'Slide',
+      bgUrl: bgUrl ?? null,
+      ...(fileId ? { fileId } : {}),
+      ...(isCopy ? { isCopy: true } : {}),
+      ...(copyOf ? { copyOf } : {}),
+      ...(typeof copyNumber === 'number' ? { copyNumber } : {})
+    }));
+  }
+
+  _hydrateFromState(state) {
+    if (!state) return;
+    const idx = Array.isArray(state.index) ? state.index : [];
+    const fresh = [];
+    for (const meta of idx) {
+      const full = state.slides?.[meta.id] || meta;
+      if (full?.id) fresh.push(full);
+    }
+    this.slides = fresh;
+  }
+
+  async _persistIndex() {
+    const state = await this.svc.saveIndexThenReload(this._buildMetaIndex());
+    this._hydrateFromState(state);
+  }
 
   addSlide() {
     const newSlide = this.createSlide();
     this.slides.push(newSlide);
-    this._persistIndex();
-    this.renderSlides();
-    if (this.slides.length === 1) this.selectSlide(newSlide.id);
+    this._persistIndex().then(() => {
+      this.renderSlides();
+      if (this.slides.length === 1) this.selectSlide(newSlide.id);
+    });
     return newSlide;
   }
 
-  /**
-   * Видаляти дозволено лише КОПІЇ або ПУСТІ слайди.
-   */
   async deleteSlide(id) {
     const slide = this.slides.find(s => s.id === id);
     const allowDelete = isCopySlide(slide) || isEmptySlide(slide);
     if (!allowDelete) {
-      // легка підказка користувачу: підсвітити
       const el = this.slideList.querySelector(`[data-id="${id}"]`);
       if (el) {
         el.classList.add('shake');
@@ -73,9 +96,8 @@ export class ViewerManager {
       return;
     }
 
-    this.slides = this.slides.filter(s => s.id !== id);
-    await this._persistIndex();
-    try { await this.svc.hardDelete(id); } catch (_) {}
+    const state = await this.svc.hardDeleteThenReload(id).catch(() => null);
+    this._hydrateFromState(state);
 
     this.renderSlides();
     if (this.selectedSlide?.id === id) {
@@ -84,7 +106,11 @@ export class ViewerManager {
     }
   }
 
-  duplicateSlide(id) {
+  /**
+   * Копіювання: копія з’являється одразу ПІД оригіналом (і в UI, і в збереженому індексі).
+   * Транзакційно: максимум 1 (опц.) getSlide + 1 create + 1 get.
+   */
+  async duplicateSlide(id) {
     const i = this.slides.findIndex(s => s.id === id);
     if (i === -1) return null;
 
@@ -93,25 +119,39 @@ export class ViewerManager {
     const nextNum = copies.length + 1;
     const baseName = (original.name || 'Slide').replace(/\s*- copy\s*\d+$/i, '');
 
-    const copy = {
+    const copyId = 'slide-' + Date.now();
+    const copyMeta = {
       ...original,
-      id: 'slide-' + Date.now(),
+      id: copyId,
       name: `${baseName} - copy ${nextNum}`,
       isCopy: true,
       copyOf: original.id,
       copyNumber: nextNum
     };
 
-    this.slides.splice(i + 1, 0, copy);
-    this._persistIndex();
-
-    this.svc.getSlide(id).then(full => {
-      const copyFull = { ...copy, canvasJSON: full?.canvasJSON ?? null };
-      return this.svc.upsertSlide(copyFull);
-    }).catch(() => {});
-
+    // 1) миттєво у UI — вставити під оригіналом
+    this.slides.splice(i + 1, 0, copyMeta);
     this.renderSlides();
-    return copy;
+
+    // 2) готуємо повні дані для збереження
+    let canvasJSON = original?.canvasJSON ?? null;
+    if (!canvasJSON) {
+      try { const full = await this.svc.getSlide(original.id).catch(() => null);
+        canvasJSON = full?.canvasJSON ?? null;
+      } catch {}
+    }
+    const copyFull = { ...copyMeta, canvasJSON };
+
+    // 3) один create → один get; вставити в індекс ПІСЛЯ original
+    const state = await this.svc
+      .saveSlideAndIndexThenReload({ slide: copyFull, updateMeta: true, insertAfterId: original.id })
+      .catch(() => null);
+
+    // 4) оновлюємо локальний список з відповіді (щоб уникнути розсинхрону)
+    this._hydrateFromState(state);
+    this.renderSlides();
+
+    return this.slides.find(s => s.id === copyId) || copyFull;
   }
 
   selectSlide(id) {
@@ -131,21 +171,14 @@ export class ViewerManager {
     return slide;
   }
 
-  /** Отримати dataURL для превʼю на основі даних документа */
   async getPreviewDataUrl(slide) {
     try {
       if (slide?.canvasJSON) {
-        const { previewDataUrl } = await generateCanvasPreviewFromJSON(
-          slide.canvasJSON,
-          { width: 1920, height: 1080 }
-        );
+        const { previewDataUrl } = await generateCanvasPreviewFromJSON(slide.canvasJSON, { width: 1920, height: 1080 });
         return previewDataUrl;
       }
       if (slide?.bgUrl) {
-        const { previewDataUrl } = await generateCanvasPreviewFromUrl(
-          slide.bgUrl,
-          { width: 1920, height: 1080, marginRatio: 0.10, background: null }
-        );
+        const { previewDataUrl } = await generateCanvasPreviewFromUrl(slide.bgUrl, { width: 1920, height: 1080, marginRatio: 0.10, background: null });
         return previewDataUrl;
       }
     } catch (e) {
@@ -183,11 +216,9 @@ export class ViewerManager {
 
   createSlide() { return { id: 'slide-' + Date.now(), name: 'Slide', bgUrl: null, canvasJSON: null }; }
 
-  /** Рендер списку слайдів з підвантаженням мініатюр */
   renderSlides() {
     this.slideList.innerHTML = '';
     this.slides.forEach(async (slide) => {
-      // спочатку створюємо картку без src — щоб UI зʼявився миттєво
       const slideEl = renderPreview(slide, {
         onDelete: () => this.deleteSlide(slide.id),
         onDuplicate: () => this.duplicateSlide(slide.id),
@@ -197,7 +228,6 @@ export class ViewerManager {
       slideEl.dataset.id = slide.id;
       this.slideList.appendChild(slideEl);
 
-      // асинхронно підвантажуємо таке саме зображення, як у великому превʼю
       const url = await this.getPreviewDataUrl(slide);
       const img = slideEl.querySelector('img.sidebar__thumb');
       if (img && url) img.src = url;
