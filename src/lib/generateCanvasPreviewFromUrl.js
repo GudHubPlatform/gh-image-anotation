@@ -9,7 +9,10 @@ export function generateCanvasPreviewFromUrl(
     const canvas = new fabric.Canvas(canvasEl, { selection: false });
 
     if (background) {
-      canvas.add(new fabric.Rect({ left: 0, top: 0, width, height, fill: background, selectable: false, evented: false }));
+      canvas.add(new fabric.Rect({
+        left: 0, top: 0, width, height, fill: background,
+        selectable: false, evented: false
+      }));
     }
 
     fabric.Image.fromURL(
@@ -22,14 +25,21 @@ export function generateCanvasPreviewFromUrl(
           if (scale < 1) img.scale(scale);
 
           img.set({
-            left: width / 2, top: height / 2, originX: 'center', originY: 'center',
-            selectable: false, evented: false, objectCaching: false
+            left: width / 2,
+            top: height / 2,
+            originX: 'center',
+            originY: 'center',
+            selectable: false,
+            evented: false,
+            objectCaching: false
           });
 
           canvas.add(img);
           canvas.renderAll();
 
-          const previewDataUrl = canvas.toDataURL({ format: "png", quality: 1, width, height, multiplier: 1 });
+          const previewDataUrl = canvas.toDataURL({
+            format: 'png', quality: 1, width, height, multiplier: 1
+          });
           const canvasJSON = canvas.toJSON();
 
           canvas.dispose();
@@ -41,5 +51,30 @@ export function generateCanvasPreviewFromUrl(
       },
       { crossOrigin: 'anonymous' }
     );
+  });
+}
+
+export function generateCanvasPreviewFromJSON(
+  canvasJSON,
+  { width = 1920, height = 1080 } = {}
+) {
+  return new Promise((resolve, reject) => {
+    const el = document.createElement('canvas');
+    el.width = width;
+    el.height = height;
+    const canvas = new fabric.Canvas(el, { selection: false });
+    try {
+      canvas.loadFromJSON(canvasJSON, () => {
+        canvas.renderAll();
+        const previewDataUrl = canvas.toDataURL({
+          format: 'png', quality: 1, width, height, multiplier: 1
+        });
+        canvas.dispose();
+        resolve({ previewDataUrl });
+      });
+    } catch (e) {
+      canvas.dispose();
+      reject(e);
+    }
   });
 }

@@ -1,4 +1,19 @@
 import { renderPreview } from './ViewerPreview.js';
+import { generateCanvasPreviewFromUrl, generateCanvasPreviewFromJSON } from '../../../lib/generateCanvasPreviewFromUrl.js';
+
+function isCopySlide(slide) {
+  return !!(slide?.isCopy || slide?.copyOf);
+}
+function isEmptySlide(slide) {
+  if (!slide) return false;
+  if (slide.fileId || slide.bgUrl) return false;
+  const json = slide.canvasJSON;
+  if (!json) return true;
+  try {
+    const objs = Array.isArray(json.objects) ? json.objects : [];
+    return objs.length === 0;
+  } catch { return true; }
+}
 
 export class ViewerManager {
   constructor({ slideList, previewWrapper, editBtn, onSlideSelect, onSlideEdit, storageKey, slidesService, initialSlidesMeta }) {
@@ -14,58 +29,55 @@ export class ViewerManager {
     this.selectedSlide = null;
 
     this.renderSlides();
-
-    if (this.slides.length > 0) {
-      this.selectSlide(this.slides[0].id);
-    } else {
-      this.showEmptyPreview();
-    }
+    if (this.slides.length > 0) this.selectSlide(this.slides[0].id);
+    else this.showEmptyPreview();
   }
 
-  async _persistIndex() {
-    await this.svc.saveIndex(this.slides);
-  }
+  async _persistIndex() { await this.svc.saveIndex(this.slides); }
 
   addSlide() {
     const newSlide = this.createSlide();
     this.slides.push(newSlide);
     this._persistIndex();
     this.renderSlides();
-
-    if (this.slides.length === 1) {
-      this.selectSlide(newSlide.id);
-    }
+    if (this.slides.length === 1) this.selectSlide(newSlide.id);
     return newSlide;
   }
 
+  /**
+   * Видаляти дозволено лише КОПІЇ або ПУСТІ слайди.
+   */
   async deleteSlide(id) {
-    this.slides = this.slides.filter(slide => slide.id !== id);
-    await this._persistIndex();
+    const slide = this.slides.find(s => s.id === id);
+    const allowDelete = isCopySlide(slide) || isEmptySlide(slide);
+    if (!allowDelete) {
+      // легка підказка користувачу: підсвітити
+      const el = this.slideList.querySelector(`[data-id="${id}"]`);
+      if (el) {
+        el.classList.add('shake');
+        setTimeout(() => el.classList.remove('shake'), 400);
+      }
+      return;
+    }
 
-    try {
-      await this.svc.hardDelete(id);
-    } catch (_) {}
+    this.slides = this.slides.filter(s => s.id !== id);
+    await this._persistIndex();
+    try { await this.svc.hardDelete(id); } catch (_) {}
 
     this.renderSlides();
-
     if (this.selectedSlide?.id === id) {
-      if (this.slides.length > 0) {
-        this.selectSlide(this.slides[0].id);
-      } else {
-        this.showEmptyPreview();
-      }
+      if (this.slides.length > 0) this.selectSlide(this.slides[0].id);
+      else this.showEmptyPreview();
     }
   }
 
   duplicateSlide(id) {
-    const originalIndex = this.slides.findIndex(s => s.id === id);
-    if (originalIndex === -1) return null;
+    const i = this.slides.findIndex(s => s.id === id);
+    if (i === -1) return null;
 
-    const original = this.slides[originalIndex];
-
+    const original = this.slides[i];
     const copies = this.slides.filter(s => s.copyOf === original.id);
     const nextNum = copies.length + 1;
-
     const baseName = (original.name || 'Slide').replace(/\s*- copy\s*\d+$/i, '');
 
     const copy = {
@@ -77,8 +89,7 @@ export class ViewerManager {
       copyNumber: nextNum
     };
 
-    this.slides.splice(originalIndex + 1, 0, copy);
-
+    this.slides.splice(i + 1, 0, copy);
     this._persistIndex();
 
     this.svc.getSlide(id).then(full => {
@@ -107,45 +118,41 @@ export class ViewerManager {
     return slide;
   }
 
-  showPreview(slide) {
+  async showPreview(slide) {
     this.previewWrapper.innerHTML = '';
-    if (slide.previewDataUrl) {
-      const img = document.createElement('img');
-      img.src = slide.previewDataUrl.startsWith('data:')
-        ? slide.previewDataUrl
-        : slide.previewDataUrl + '?t=' + Date.now();
-      this.previewWrapper.appendChild(img);
-    } else {
+    try {
+      let dataUrl = null;
+      if (slide.canvasJSON) {
+        const { previewDataUrl } = await generateCanvasPreviewFromJSON(slide.canvasJSON, { width: 1920, height: 1080 });
+        dataUrl = previewDataUrl;
+      } else if (slide.bgUrl) {
+        const { previewDataUrl } = await generateCanvasPreviewFromUrl(slide.bgUrl, { width: 1920, height: 1080, marginRatio: 0.10, background: null });
+        dataUrl = previewDataUrl;
+      }
+      if (dataUrl) {
+        const img = document.createElement('img');
+        img.src = dataUrl;
+        this.previewWrapper.appendChild(img);
+      } else {
+        this.showEmptyPreview();
+      }
+    } catch (e) {
+      console.error('Preview render failed:', e);
       this.showEmptyPreview();
     }
   }
 
   showEmptyPreview() {
-    this.previewWrapper.innerHTML = `
-      <div class="main__preview-wrapper--empty">
-        Please select or add a slide
-      </div>
-    `;
-
-    if (this.editBtn) {
-      this.editBtn.style.display = 'none';
-    }
+    this.previewWrapper.innerHTML = `<div class="main__preview-wrapper--empty">Please select or add a slide</div>`;
+    if (this.editBtn) this.editBtn.style.display = 'none';
   }
 
   updateActiveSlideUI(activeId) {
     const containers = this.slideList.querySelectorAll('.slide-preview-container, .sidebar__slide-preview-container');
-    containers.forEach(el => {
-      el.classList.toggle('active', el.dataset.id === activeId);
-    });
+    containers.forEach(el => el.classList.toggle('active', el.dataset.id === activeId));
   }
 
-  createSlide() {
-    return {
-      id: 'slide-' + Date.now(),
-      name: 'Slide',
-      previewDataUrl: null
-    };
-  }
+  createSlide() { return { id: 'slide-' + Date.now(), name: 'Slide', bgUrl: null, canvasJSON: null }; }
 
   renderSlides() {
     this.slideList.innerHTML = '';
@@ -153,15 +160,11 @@ export class ViewerManager {
       const slideEl = renderPreview(slide, {
         onDelete: () => this.deleteSlide(slide.id),
         onDuplicate: () => this.duplicateSlide(slide.id),
-        onSelect: () => this.selectSlide(slide.id),
-        onEdit: () => this.onSlideEdit?.(slide)
+        onSelect: () => this.selectSlide(slide.id)
       });
       slideEl.dataset.id = slide.id;
       this.slideList.appendChild(slideEl);
     });
-
-    if (this.selectedSlide) {
-      this.updateActiveSlideUI(this.selectedSlide.id);
-    }
+    if (this.selectedSlide) this.updateActiveSlideUI(this.selectedSlide.id);
   }
 }

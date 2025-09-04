@@ -40,7 +40,7 @@ class GhImageAnnotation extends GhHtmlElement {
     editorEl.addEventListener('editor:save', (e) => {
       this.showViewer();
       const viewer = this.querySelector('gh-annotations-viewer');
-      viewer?.refreshSlides({ select: slideId });
+      viewer?.refreshSlides({ select: slideId, sync: false });
     });
 
     editorWrapper.appendChild(editorEl);
