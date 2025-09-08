@@ -2,6 +2,7 @@ import html from './annotations-editor.html';
 import styles from './annotations-editor.scss';
 import PaintEditor from './editor/PaintEditor.js';
 import { resetHistory } from './editor/state/history.js';
+import { slidesServiceDM } from '../../services/slidesServiceDM.js';
 
 class GhAnnotationsEditor extends HTMLElement {
     constructor() {
@@ -92,7 +93,8 @@ class GhAnnotationsEditor extends HTMLElement {
         const slideId = this.getAttribute('slide-id');
         const storageKey = this.getAttribute('storage-key') || 'slides';
 
-        let slides = JSON.parse(localStorage.getItem(storageKey) || '[]');
+        // let slides = JSON.parse(localStorage.getItem(storageKey) || '[]');
+        let slides = slidesServiceDM.getDataWithSlides(storageKey);
         this.currentSlideIndex = slides.findIndex(s => s.id === slideId);
 
         this.editor = new PaintEditor(this);

@@ -1,6 +1,7 @@
 import html from './annotations-viewer.html';
 import styles from './annotations-viewer.scss';
 import { ViewerManager } from './viewer/ViewerManager.js';
+import { slidesServiceDM } from '../../services/slidesServiceDM.js';
 
 class GhAnnotationsViewer extends HTMLElement {
   constructor() {
@@ -52,7 +53,8 @@ class GhAnnotationsViewer extends HTMLElement {
         })).filter(s => !!s.bgUrl);
 
         if (slides.length) {
-          localStorage.setItem(storageKey, JSON.stringify(slides));
+          // localStorage.setItem(storageKey, JSON.stringify(slides));
+          slidesServiceDM.createDataWithSlides(storageKey, slides);
         }
       } catch (e) {
         console.error('Failed to bootstrap slides from Gudhub:', e);

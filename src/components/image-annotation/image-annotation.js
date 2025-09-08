@@ -5,6 +5,8 @@ import styles from "./image-annotation.scss";
 import '../annotations-viewer/annotations-viewer.js';
 import '../annotations-editor/annotations-editor.js';
 
+import { slidesServiceDM } from '../../services/slidesServiceDM.js';
+
 class GhImageAnnotation extends GhHtmlElement {
   constructor() {
     super();
@@ -39,12 +41,14 @@ class GhImageAnnotation extends GhHtmlElement {
 
     editorEl.addEventListener('editor:save', (e) => {
       const { json, dataUrl, currentSlideIndex, storageKey } = e.detail;
-      const slides = JSON.parse(localStorage.getItem(storageKey || 'slides') || '[]');
+      // const slides = JSON.parse(localStorage.getItem(storageKey || 'slides') || '[]');
+      const slides = slidesServiceDM.getDataWithSlides(storageKey || 'slides');
 
       if (currentSlideIndex !== -1) {
         slides[currentSlideIndex].canvasJSON = json;
         slides[currentSlideIndex].previewDataUrl = dataUrl;
-        localStorage.setItem(storageKey || 'slides', JSON.stringify(slides));
+        // localStorage.setItem(storageKey || 'slides', JSON.stringify(slides));
+        slidesServiceDM.createDataWithSlides(storageKey || 'slides', slides);
       }
 
       this.showViewer();

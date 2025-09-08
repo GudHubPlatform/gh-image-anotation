@@ -1,9 +1,11 @@
 import PaintEditor from './PaintEditor.js';
+import { slidesServiceDM } from '../../../services/slidesServiceDM.js';
 
 const urlParams = new URLSearchParams(window.location.search);
 const slideId = urlParams.get('id');
 
-let slides = JSON.parse(localStorage.getItem('slides') || '[]');
+// let slides = JSON.parse(localStorage.getItem('slides') || '[]');
+let slides = slidesServiceDM.getDataWithSlides('slides');
 let currentSlideIndex = slides.findIndex(s => s.id === slideId);
 
 const editor = new PaintEditor();
@@ -34,7 +36,8 @@ document.getElementById('finalSaveBtn').addEventListener('click', () => {
     slides[currentSlideIndex].canvasJSON = json;
     slides[currentSlideIndex].previewDataUrl = dataUrl;
 
-    localStorage.setItem('slides', JSON.stringify(slides));
+    // localStorage.setItem('slides', JSON.stringify(slides));
+    slidesServiceDM.createDataWithSlides('slides', slides);
 
     window.location.href = 'slides.html';
   } else {

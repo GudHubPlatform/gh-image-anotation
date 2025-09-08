@@ -1,4 +1,5 @@
 import { renderPreview, renderSlides } from './ViewerPreview.js';
+import { slidesServiceDM } from '../../../services/slidesServiceDM.js';
 
 export class ViewerManager {
   constructor({ slideList, previewWrapper, editBtn, onSlideSelect, onSlideEdit, storageKey }) {
@@ -20,7 +21,8 @@ export class ViewerManager {
   }
 
   saveSlides() {
-    localStorage.setItem(this.storageKey, JSON.stringify(this.slides));
+    // localStorage.setItem(this.storageKey, JSON.stringify(this.slides));
+    slidesServiceDM.createDataWithSlides(this.storageKey, this.slides)
   }
 
   addSlide() {
@@ -114,7 +116,8 @@ export class ViewerManager {
   }
 
   loadSlides() {
-    return JSON.parse(localStorage.getItem(this.storageKey) || '[]');
+    // return JSON.parse(localStorage.getItem(this.storageKey) || '[]');
+    return slidesServiceDM.getDataWithSlides(this.storageKey);
   }
 
   createSlide() {
