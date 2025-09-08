@@ -22,7 +22,7 @@ export class ViewerManager {
 
   saveSlides() {
     // localStorage.setItem(this.storageKey, JSON.stringify(this.slides));
-    slidesServiceDM.createDataWithSlides(this.storageKey, this.slides)
+    slidesServiceDM.createDataWithSlides(this.slides)
   }
 
   addSlide() {
@@ -117,7 +117,7 @@ export class ViewerManager {
 
   loadSlides() {
     // return JSON.parse(localStorage.getItem(this.storageKey) || '[]');
-    return slidesServiceDM.getDataWithSlides(this.storageKey);
+    return slidesServiceDM.getDataWithSlides();
   }
 
   createSlide() {

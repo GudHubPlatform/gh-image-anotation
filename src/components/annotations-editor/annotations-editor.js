@@ -94,7 +94,7 @@ class GhAnnotationsEditor extends HTMLElement {
         const storageKey = this.getAttribute('storage-key') || 'slides';
 
         // let slides = JSON.parse(localStorage.getItem(storageKey) || '[]');
-        let slides = slidesServiceDM.getDataWithSlides(storageKey);
+        let slides = slidesServiceDM.getDataWithSlides();
         this.currentSlideIndex = slides.findIndex(s => s.id === slideId);
 
         this.editor = new PaintEditor(this);

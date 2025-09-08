@@ -54,7 +54,7 @@ class GhAnnotationsViewer extends HTMLElement {
 
         if (slides.length) {
           // localStorage.setItem(storageKey, JSON.stringify(slides));
-          slidesServiceDM.createDataWithSlides(storageKey, slides);
+          slidesServiceDM.createDataWithSlides(slides);
         }
       } catch (e) {
         console.error('Failed to bootstrap slides from Gudhub:', e);

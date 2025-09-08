@@ -5,7 +5,7 @@ const urlParams = new URLSearchParams(window.location.search);
 const slideId = urlParams.get('id');
 
 // let slides = JSON.parse(localStorage.getItem('slides') || '[]');
-let slides = slidesServiceDM.getDataWithSlides('slides');
+let slides = slidesServiceDM.getDataWithSlides();
 let currentSlideIndex = slides.findIndex(s => s.id === slideId);
 
 const editor = new PaintEditor();
@@ -37,7 +37,7 @@ document.getElementById('finalSaveBtn').addEventListener('click', () => {
     slides[currentSlideIndex].previewDataUrl = dataUrl;
 
     // localStorage.setItem('slides', JSON.stringify(slides));
-    slidesServiceDM.createDataWithSlides('slides', slides);
+    slidesServiceDM.createDataWithSlides(slides);
 
     window.location.href = 'slides.html';
   } else {

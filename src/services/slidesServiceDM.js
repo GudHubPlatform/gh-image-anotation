@@ -1,16 +1,25 @@
 class SlidesServiceDM {
   constructor() {
     this._cacheData = null;
+    console.log("[SlidesServiceDM] Initialized with empty cache");
   }
 
-  getDataWithSlides(storageKey) {
-    const gudHubDocumentData = JSON.parse(localStorage.getItem(storageKey) || '[]');
-    this._cacheData = gudHubDocumentData;
+  getDataWithSlides() {
+    console.log("[SlidesServiceDM] getDataWithSlides called");
+    console.log("  loadedData:", this._cacheData);
+    return this._cacheData;
   }
 
-  createDataWithSlides(storageKey, slidesData) {
-    localStorage.setItem(storageKey, JSON.stringify(slidesData));
+  createDataWithSlides(slidesData) {
     this._cacheData = slidesData;
+
+    console.log("[SlidesServiceDM] createDataWithSlides called");
+    console.log("  savedData:", slidesData);
+  }
+
+  clearData() {
+    this._cacheData = null;
+    console.log("[SlidesServiceDM] clearData called, cache cleared");
   }
 }
 

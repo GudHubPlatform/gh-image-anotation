@@ -42,13 +42,13 @@ class GhImageAnnotation extends GhHtmlElement {
     editorEl.addEventListener('editor:save', (e) => {
       const { json, dataUrl, currentSlideIndex, storageKey } = e.detail;
       // const slides = JSON.parse(localStorage.getItem(storageKey || 'slides') || '[]');
-      const slides = slidesServiceDM.getDataWithSlides(storageKey || 'slides');
+      const slides = slidesServiceDM.getDataWithSlides();
 
       if (currentSlideIndex !== -1) {
         slides[currentSlideIndex].canvasJSON = json;
         slides[currentSlideIndex].previewDataUrl = dataUrl;
         // localStorage.setItem(storageKey || 'slides', JSON.stringify(slides));
-        slidesServiceDM.createDataWithSlides(storageKey || 'slides', slides);
+        slidesServiceDM.createDataWithSlides(slides);
       }
 
       this.showViewer();
