@@ -1,14 +1,16 @@
 import { renderPreview, renderSlides } from './ViewerPreview.js';
 
 export class ViewerManager {
-  constructor({ slideList, previewWrapper, editBtn, onSlideSelect, onSlideEdit, storageKey }) {
+  constructor({ slideList, previewWrapper, editBtn, onSlideSelect, onSlideEdit, storageKey, service }) {
     this.slideList = slideList;
     this.previewWrapper = previewWrapper;
     this.editBtn = editBtn;
     this.onSlideSelect = onSlideSelect;
     this.onSlideEdit = onSlideEdit;
     this.storageKey = storageKey || 'slides';
-    this.slides = this.loadSlides();
+    this.service = service;
+
+    this.slides = this.service.getAllSlides();
     this.selectedSlide = null;
     this.renderSlides();
 
@@ -19,14 +21,10 @@ export class ViewerManager {
     }
   }
 
-  saveSlides() {
-    localStorage.setItem(this.storageKey, JSON.stringify(this.slides));
-  }
-
   addSlide() {
-    const newSlide = this.createSlide();
-    this.slides.push(newSlide);
-    this.saveSlides();
+    const newSlide = this.service.addSlide();
+    this.slides = this.service.getAllSlides();
+    this.service.persist(); // 1 запит: createDocument
     this.renderSlides();
     if (this.slides.length === 1) {
       this.selectSlide(newSlide.id);
@@ -35,8 +33,9 @@ export class ViewerManager {
   }
 
   deleteSlide(id) {
-    this.slides = this.slides.filter(slide => slide.id !== id);
-    this.saveSlides();
+    this.service.deleteSlide(id);
+    this.slides = this.service.getAllSlides();
+    this.service.persist(); // 1 запит
     this.renderSlides();
     if (this.selectedSlide?.id === id) {
       if (this.slides.length > 0) {
@@ -48,25 +47,16 @@ export class ViewerManager {
   }
 
   duplicateSlide(id) {
-    const originalIndex = this.slides.findIndex(s => s.id === id);
-    if (originalIndex === -1) return null;
-
-    const original = this.slides[originalIndex];
-    const copy = {
-      ...original,
-      id: 'slide-' + Date.now(),
-      name: original.name + ' (copy)'
-    };
-
-    this.slides.splice(originalIndex + 1, 0, copy);
-    this.saveSlides();
+    const copy = this.service.duplicateSlide(id);
+    if (!copy) return null;
+    this.slides = this.service.getAllSlides();
+    this.service.persist(); // 1 запит
     this.renderSlides();
-
     return copy;
   }
 
   selectSlide(id) {
-    const slide = this.slides.find(s => s.id === id);
+    const slide = this.service.getSlide(id) || this.slides.find(s => s.id === id);
     if (!slide) return null;
     this.selectedSlide = slide;
     this.updateActiveSlideUI(id);
@@ -107,27 +97,15 @@ export class ViewerManager {
   }
 
   updateActiveSlideUI(activeId) {
-    const containers = this.slideList.querySelectorAll('.slide-preview-container');
+    // лишаємо як було, щоб не ламати існуючу розмітку
+    const containers = this.slideList.querySelectorAll('.slide-preview-container, .sidebar__slide-preview-container');
     containers.forEach(el => {
       el.classList.toggle('active', el.dataset.id === activeId);
     });
   }
 
-  loadSlides() {
-    return JSON.parse(localStorage.getItem(this.storageKey) || '[]');
-  }
-
-  createSlide() {
-    return {
-      id: 'slide-' + Date.now(),
-      name: 'Slide',
-      canvasJSON: null,
-      previewDataUrl: null
-    };
-  }
-
   renderSlides() {
-    this.slides = this.loadSlides();
+    this.slides = this.service.getAllSlides();
     this.slideList.innerHTML = '';
     this.slides.forEach(slide => {
       const slideEl = renderPreview(slide, {

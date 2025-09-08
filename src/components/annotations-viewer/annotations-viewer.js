@@ -1,11 +1,13 @@
 import html from './annotations-viewer.html';
 import styles from './annotations-viewer.scss';
 import { ViewerManager } from './viewer/ViewerManager.js';
+import SlidesService from '../../services/SlidesService.js';
 
 class GhAnnotationsViewer extends HTMLElement {
   constructor() {
     super();
     this.manager = null;
+    this.service = null;
   }
 
   connectedCallback() {
@@ -29,41 +31,58 @@ class GhAnnotationsViewer extends HTMLElement {
     const appId = this.getAttribute('data-app-id');
     const itemId = this.getAttribute('data-item-id')?.split('.')[1];
     const fieldId = this.getAttribute('data-field-id');
-    
     const storageKey = this.getAttribute('storage-key') || 'slides';
 
-    if (appId) {
+    // Використовуємо вже існуючий глобальний gudhub (як у твоєму коді)
+    // Якщо потрібно — можна додати data-auth-key і створювати інстанс тут.
+    const gudhubInstance = (typeof window !== 'undefined' && (window.gudhub || window.GudHubInstance)) || (typeof gudhub !== 'undefined' ? gudhub : null);
+
+    this.service = new SlidesService({
+      gudhubInstance,
+      app_id: Number(appId),
+      element_id: Number(fieldId),
+      item_id: Number(itemId),
+      storageKey,
+    });
+
+    // 1) Завантажуємо поточний документ (getDocument — один запит)
+    const currentSlides = await this.service.load();
+
+    // Якщо документа ще нема, але в полі зображень є дані — ініціалізуємо слайди та збережемо документ 1 раз.
+    if (appId && (!currentSlides || currentSlides.length === 0)) {
       try {
-        const gudhubImagesFieldValue = await gudhub.getFieldValue(appId, itemId, fieldId);
+        const gudhubImagesFieldValue = await gudhubInstance.getFieldValue(appId, itemId, fieldId);
         const idsArray = gudhubImagesFieldValue
-          .split(",")
-          .map(id => id.trim())
+          .split(',')
+          .map((id) => id.trim())
           .filter(Boolean);
 
-        const gudhubImagesDataFiles = await gudhub.getFiles(appId, idsArray);
-        const imagesUrl = gudhubImagesDataFiles?.map(file => file?.url);
+        const gudhubImagesDataFiles = await gudhubInstance.getFiles(appId, idsArray);
+        const imagesUrl = gudhubImagesDataFiles?.map((file) => file?.url);
 
-        const slides = imagesUrl.map((url, i) => ({
-          id: `slide-${Date.now()}-${i}`,
-          name: `Slide ${i + 1}`,
-          canvasJSON: null,
-          previewDataUrl: url,
-          bgUrl: url
-        })).filter(s => !!s.bgUrl);
-
-        if (slides.length) {
-          localStorage.setItem(storageKey, JSON.stringify(slides));
+        if (imagesUrl?.length) {
+          imagesUrl.forEach((url, i) => {
+            this.service.addSlide({
+              id: `slide-${Date.now()}-${i}`,
+              name: `Slide ${i + 1}`,
+              previewDataUrl: url,
+              bgUrl: url,
+            });
+          });
+          await this.service.persist(); // createDocument — один запит
         }
       } catch (e) {
         console.error('Failed to bootstrap slides from Gudhub:', e);
       }
     }
 
+    // 2) Ініціалізуємо менеджер перегляду, який працює лише з кешем сервісу
     this.manager = new ViewerManager({
       slideList,
       previewWrapper,
       editBtn,
       storageKey,
+      service: this.service,
       onSlideSelect: () => {},
       onSlideEdit: (slide) => {
         this.dispatchEvent(new CustomEvent('edit', {
@@ -73,6 +92,9 @@ class GhAnnotationsViewer extends HTMLElement {
         }));
       }
     });
+
+    // expose service на елементі, щоб image-annotation міг його використати
+    this.service = this.manager.service;
 
     addSlideBtn?.addEventListener('click', () => this.manager.addSlide());
   }

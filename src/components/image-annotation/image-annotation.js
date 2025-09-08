@@ -8,6 +8,7 @@ import '../annotations-editor/annotations-editor.js';
 class GhImageAnnotation extends GhHtmlElement {
   constructor() {
     super();
+    this.service = null;
   }
 
   onInit() {
@@ -18,6 +19,17 @@ class GhImageAnnotation extends GhHtmlElement {
 
     const viewerEl = this.querySelector('gh-annotations-viewer');
     if (viewerEl) {
+      // дочекаймося ініціалізації viewer-а
+      const exposeService = () => {
+        if (viewerEl.service) {
+          this.service = viewerEl.service;
+        } else {
+          // невелика спроба повторити (ініт асинхронний)
+          setTimeout(exposeService, 50);
+        }
+      };
+      exposeService();
+
       viewerEl.addEventListener('edit', (e) => {
         const { slideId } = e.detail;
         this.showEditor(slideId);
@@ -37,14 +49,12 @@ class GhImageAnnotation extends GhHtmlElement {
       this.showViewer();
     });
 
-    editorEl.addEventListener('editor:save', (e) => {
-      const { json, dataUrl, currentSlideIndex, storageKey } = e.detail;
-      const slides = JSON.parse(localStorage.getItem(storageKey || 'slides') || '[]');
-
-      if (currentSlideIndex !== -1) {
-        slides[currentSlideIndex].canvasJSON = json;
-        slides[currentSlideIndex].previewDataUrl = dataUrl;
-        localStorage.setItem(storageKey || 'slides', JSON.stringify(slides));
+    editorEl.addEventListener('editor:save', async (e) => {
+      const { json, dataUrl } = e.detail;
+      // Оновлюємо лише кеш сервісу + 1 запит createDocument з усіма слайдами
+      if (this.service) {
+        this.service.updateSlide(slideId, { canvasJSON: json, previewDataUrl: dataUrl });
+        await this.service.persist();
       }
 
       this.showViewer();
