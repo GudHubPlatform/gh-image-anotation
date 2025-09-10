@@ -10,6 +10,16 @@ import { slidesServiceDM } from '../../services/slidesServiceDM.js';
 class GhImageAnnotation extends GhHtmlElement {
   constructor() {
     super();
+
+    //TODO: Need to remove this gudHub data below
+    this.appId = '36609';
+    this.fieldId = '863613';
+    this.itemId = '4900015';
+    this.documentAddress = {
+      appId: this.appId,
+      fieldId: this.fieldId,
+      itemId: this.itemId
+    };
   }
 
   onInit() {
@@ -42,13 +52,13 @@ class GhImageAnnotation extends GhHtmlElement {
     editorEl.addEventListener('editor:save', (e) => {
       const { json, dataUrl, currentSlideIndex, storageKey } = e.detail;
       // const slides = JSON.parse(localStorage.getItem(storageKey || 'slides') || '[]');
-      const slides = slidesServiceDM.getDataWithSlides();
+      const slides = slidesServiceDM.getDataWithSlides(this.documentAddress);
 
       if (currentSlideIndex !== -1) {
         slides[currentSlideIndex].canvasJSON = json;
         slides[currentSlideIndex].previewDataUrl = dataUrl;
         // localStorage.setItem(storageKey || 'slides', JSON.stringify(slides));
-        slidesServiceDM.createDataWithSlides(slides);
+        slidesServiceDM.createDataWithSlides(this.documentAddress, slides);
       }
 
       this.showViewer();

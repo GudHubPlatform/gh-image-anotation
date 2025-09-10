@@ -7,6 +7,17 @@ import { slidesServiceDM } from '../../services/slidesServiceDM.js';
 class GhAnnotationsEditor extends HTMLElement {
     constructor() {
         super();
+
+        //TODO: Need to remove this gudHub data below
+        this.appId = '36609';
+        this.fieldId = '863613';
+        this.itemId = '4900015';
+        this.documentAddress = {
+            appId: this.appId,
+            fieldId: this.fieldId,
+            itemId: this.itemId
+        };
+
         this.editor = null;
         this.currentSlideIndex = -1;
 
@@ -94,7 +105,7 @@ class GhAnnotationsEditor extends HTMLElement {
         const storageKey = this.getAttribute('storage-key') || 'slides';
 
         // let slides = JSON.parse(localStorage.getItem(storageKey) || '[]');
-        let slides = slidesServiceDM.getDataWithSlides();
+        let slides = slidesServiceDM.getDataWithSlides(this.documentAddress);
         this.currentSlideIndex = slides.findIndex(s => s.id === slideId);
 
         this.editor = new PaintEditor(this);

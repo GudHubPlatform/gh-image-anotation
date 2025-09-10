@@ -1,5 +1,10 @@
 gh-element[element-type="image_annotation"] {
   height: 100%;
+
+  & > span {
+    height: 100%;
+    width: 100%;
+  }
 }
 
 gh-annotations-viewer {

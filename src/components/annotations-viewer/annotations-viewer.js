@@ -6,6 +6,17 @@ import { slidesServiceDM } from '../../services/slidesServiceDM.js';
 class GhAnnotationsViewer extends HTMLElement {
   constructor() {
     super();
+
+    //TODO: Need to remove this gudHub data below
+    this.appId = '36609';
+    this.fieldId = '863613';
+    this.itemId = '4900015';
+    this.documentAddress = {
+      appId: this.appId,
+      fieldId: this.fieldId,
+      itemId: this.itemId
+    };
+
     this.manager = null;
   }
 
@@ -54,7 +65,7 @@ class GhAnnotationsViewer extends HTMLElement {
 
         if (slides.length) {
           // localStorage.setItem(storageKey, JSON.stringify(slides));
-          slidesServiceDM.createDataWithSlides(slides);
+          slidesServiceDM.createDataWithSlides(this.documentAddress, slides);
         }
       } catch (e) {
         console.error('Failed to bootstrap slides from Gudhub:', e);

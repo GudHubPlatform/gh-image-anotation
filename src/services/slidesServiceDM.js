@@ -1,25 +1,30 @@
 class SlidesServiceDM {
   constructor() {
-    this._cacheData = null;
-    console.log("[SlidesServiceDM] Initialized with empty cache");
+    this._cache = null;
+    this._loaded = false;
   }
 
-  getDataWithSlides() {
-    console.log("[SlidesServiceDM] getDataWithSlides called");
-    console.log("  loadedData:", this._cacheData);
-    return this._cacheData;
+  async getDataWithSlides({ appId, fieldId, itemId }) {
+    if (this._loaded) return this._cache;
+
+    const data = await gudhub.getDocument(appId, fieldId, itemId);
+    this._cache = data ?? null;
+    this._loaded = true;
+    return this._cache;
   }
 
-  createDataWithSlides(slidesData) {
-    this._cacheData = slidesData;
+  async createDataWithSlides({ appId, fieldId, itemId }, slidesData) {
+    const resultDataFromDocumentManager = await gudhub.createDocument(appId, fieldId, itemId, slidesData);
+    console.log("resultDataFromDocumentManager:", resultDataFromDocumentManager);
 
-    console.log("[SlidesServiceDM] createDataWithSlides called");
-    console.log("  savedData:", slidesData);
+    this._cache = slidesData ?? null;
+    this._loaded = true;
+    return this._cache;
   }
 
   clearData() {
-    this._cacheData = null;
-    console.log("[SlidesServiceDM] clearData called, cache cleared");
+    this._cache = null;
+    this._loaded = false;
   }
 }
 

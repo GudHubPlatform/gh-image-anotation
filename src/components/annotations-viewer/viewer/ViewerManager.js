@@ -3,6 +3,16 @@ import { slidesServiceDM } from '../../../services/slidesServiceDM.js';
 
 export class ViewerManager {
   constructor({ slideList, previewWrapper, editBtn, onSlideSelect, onSlideEdit, storageKey }) {
+    //TODO: Need to remove this gudHub data below
+    this.appId = '36609';
+    this.fieldId = '863613';
+    this.itemId = '4900015';
+    this.documentAddress = {
+      appId: this.appId,
+      fieldId: this.fieldId,
+      itemId: this.itemId
+    };
+
     this.slideList = slideList;
     this.previewWrapper = previewWrapper;
     this.editBtn = editBtn;
@@ -22,7 +32,7 @@ export class ViewerManager {
 
   saveSlides() {
     // localStorage.setItem(this.storageKey, JSON.stringify(this.slides));
-    slidesServiceDM.createDataWithSlides(this.slides)
+    slidesServiceDM.createDataWithSlides(this.documentAddress, this.slides)
   }
 
   addSlide() {
@@ -117,7 +127,7 @@ export class ViewerManager {
 
   loadSlides() {
     // return JSON.parse(localStorage.getItem(this.storageKey) || '[]');
-    return slidesServiceDM.getDataWithSlides();
+    return slidesServiceDM.getDataWithSlides(this.documentAddress);
   }
 
   createSlide() {

@@ -1,11 +1,21 @@
 import PaintEditor from './PaintEditor.js';
 import { slidesServiceDM } from '../../../services/slidesServiceDM.js';
 
+//TODO: Need to remove this gudHub data below
+const appId = '36609';
+const fieldId = '863613';
+const itemId = '4900015';
+const documentAddress = {
+  appId,
+  fieldId,
+  itemId
+};
+
 const urlParams = new URLSearchParams(window.location.search);
 const slideId = urlParams.get('id');
 
 // let slides = JSON.parse(localStorage.getItem('slides') || '[]');
-let slides = slidesServiceDM.getDataWithSlides();
+let slides = slidesServiceDM.getDataWithSlides(documentAddress);
 let currentSlideIndex = slides.findIndex(s => s.id === slideId);
 
 const editor = new PaintEditor();
@@ -37,7 +47,7 @@ document.getElementById('finalSaveBtn').addEventListener('click', () => {
     slides[currentSlideIndex].previewDataUrl = dataUrl;
 
     // localStorage.setItem('slides', JSON.stringify(slides));
-    slidesServiceDM.createDataWithSlides(slides);
+    slidesServiceDM.createDataWithSlides(documentAddress, slides);
 
     window.location.href = 'slides.html';
   } else {
