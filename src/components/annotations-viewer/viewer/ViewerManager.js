@@ -1,4 +1,4 @@
-import { renderPreview, renderSlides } from './ViewerPreview.js';
+import { renderPreview } from './ViewerPreview.js';
 import { slidesServiceDM } from '../../../services/slidesServiceDM.js';
 
 export class ViewerManager {
@@ -8,9 +8,9 @@ export class ViewerManager {
     this.fieldId = '863613';
     this.itemId = '4900015';
     this.documentAddress = {
-      appId: this.appId,
-      fieldId: this.fieldId,
-      itemId: this.itemId
+        app_id: this.appId,
+        item_id: this.itemId,
+        element_id: this.fieldId
     };
 
     this.slideList = slideList;
@@ -125,9 +125,9 @@ export class ViewerManager {
     });
   }
 
-  loadSlides() {
+  async loadSlides() {
     // return JSON.parse(localStorage.getItem(this.storageKey) || '[]');
-    return slidesServiceDM.getDataWithSlides(this.documentAddress);
+    return await slidesServiceDM.getDataWithSlides(this.documentAddress);
   }
 
   createSlide() {
@@ -139,8 +139,8 @@ export class ViewerManager {
     };
   }
 
-  renderSlides() {
-    this.slides = this.loadSlides();
+  async renderSlides() {
+    this.slides = await this.loadSlides();
     this.slideList.innerHTML = '';
     this.slides.forEach(slide => {
       const slideEl = renderPreview(slide, {
@@ -152,6 +152,7 @@ export class ViewerManager {
       slideEl.dataset.id = slide.id;
       this.slideList.appendChild(slideEl);
     });
+
     if (this.selectedSlide) {
       this.updateActiveSlideUI(this.selectedSlide.id);
     }

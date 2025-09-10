@@ -16,9 +16,9 @@ class GhImageAnnotation extends GhHtmlElement {
     this.fieldId = '863613';
     this.itemId = '4900015';
     this.documentAddress = {
-      appId: this.appId,
-      fieldId: this.fieldId,
-      itemId: this.itemId
+      app_id: this.appId,
+      item_id: this.itemId,
+      element_id: this.fieldId
     };
   }
 

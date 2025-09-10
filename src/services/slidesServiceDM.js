@@ -4,28 +4,31 @@ class SlidesServiceDM {
     this._loaded = false;
   }
 
-  async getDataWithSlides({ appId, fieldId, itemId }) {
+  async getDataWithSlides(documentAddress) {
     if (this._loaded) return this._cache;
 
-    const data = await gudhub.getDocument(appId, fieldId, itemId);
-    this._cache = data ?? null;
+    const documentManagerResponse = await gudhub.getDocument(documentAddress);
+    console.log("getDataWithSlides:", documentManagerResponse?.data);
+    
+    this._cache = documentManagerResponse?.data ?? null;
     this._loaded = true;
     return this._cache;
   }
 
-  async createDataWithSlides({ appId, fieldId, itemId }, slidesData) {
-    const resultDataFromDocumentManager = await gudhub.createDocument(appId, fieldId, itemId, slidesData);
-    console.log("resultDataFromDocumentManager:", resultDataFromDocumentManager);
+  async createDataWithSlides(documentAddress, slidesData) {
+    const slidesDataForDocumentManager = { ...documentAddress, data: slidesData };
+    const resultDataFromDocumentManager = await gudhub.createDocument(slidesDataForDocumentManager);
+    console.log("createDataWithSlides:", resultDataFromDocumentManager);
 
-    this._cache = slidesData ?? null;
+    this._cache = resultDataFromDocumentManager?.data ?? null;
     this._loaded = true;
     return this._cache;
   }
 
-  clearData() {
-    this._cache = null;
-    this._loaded = false;
-  }
+  // clearData() {
+  //   this._cache = null;
+  //   this._loaded = false;
+  // }
 }
 
 export const slidesServiceDM = new SlidesServiceDM();

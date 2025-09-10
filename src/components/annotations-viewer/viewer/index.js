@@ -6,9 +6,9 @@ const appId = '36609';
 const fieldId = '863613';
 const itemId = '4900015';
 const documentAddress = {
-  appId,
-  fieldId,
-  itemId
+  app_id: appId,
+  item_id: itemId,
+  element_id: fieldId
 };
 
 const urlParams = new URLSearchParams(window.location.search);

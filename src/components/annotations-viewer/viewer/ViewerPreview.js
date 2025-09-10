@@ -1,13 +1,3 @@
-export function renderSlides(slides, container, getHandlers) {
-  container.innerHTML = '';
-
-  slides.forEach(slide => {
-    const handlers = getHandlers(slide);
-    const slideEl = renderPreview(slide, handlers);
-    container.appendChild(slideEl);
-  });
-}
-
 export function renderPreview(slide, { onDelete, onDuplicate, onSelect }) {
   const container = document.createElement('div');
   container.className = 'sidebar__slide-preview-container';
@@ -64,3 +54,13 @@ export function renderPreview(slide, { onDelete, onDuplicate, onSelect }) {
 
   return container;
 }
+
+// export function renderSlides(slides, container, getHandlers) {
+//   container.innerHTML = '';
+
+//   slides.forEach(slide => {
+//     const handlers = getHandlers(slide);
+//     const slideEl = renderPreview(slide, handlers);
+//     container.appendChild(slideEl);
+//   });
+// }
