@@ -33,12 +33,6 @@ class SlidesServiceDM {
     this._loadingPromise = null;
     return this._cache;
   }
-
-  // clearData() {
-  //   this._cache = null;
-  //   this._loaded = false;
-  //   this._loadingPromise = null;
-  // }
 }
 
 export const slidesServiceDM = new SlidesServiceDM();

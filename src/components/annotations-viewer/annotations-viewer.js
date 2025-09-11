@@ -46,39 +46,102 @@ class GhAnnotationsViewer extends HTMLElement {
     if (appId) {
       try {
         const gudhubImagesFieldValue = await gudhub.getFieldValue(appId, itemId, fieldId);
-        const idsArray = gudhubImagesFieldValue
-          .split(",")
+        const idsArray = (gudhubImagesFieldValue || '')
+          .split(',')
           .map(id => id.trim())
           .filter(Boolean);
 
         const gudhubImagesDataFiles = await gudhub.getFiles(appId, idsArray);
-        const requiredFiles = (gudhubImagesDataFiles || []).map(f => ({
-          fileId: f?.id ?? f?.file_id,
-          url: f?.url ?? null
-        })).filter(x => x.fileId && x.url);
+
+        const requiredFiles = (gudhubImagesDataFiles || [])
+          .map(f => ({
+            fileId: f?.id ?? f?.file_id,
+            url: f?.url ?? null
+          }))
+          .filter(x => x.fileId && x.url);
+
+        const requiredIdsSet = new Set(requiredFiles.map(x => x.fileId));
+        const urlById = new Map(requiredFiles.map(x => [x.fileId, x.url]));
 
         let slides = await slidesServiceDM.getDataWithSlides(this.documentAddress);
         if (!Array.isArray(slides)) slides = [];
 
-        const existing = new Set(slides.map(s => s?.fileId).filter(Boolean));
+        const validateImage = (url, timeoutMs = 5000) => {
+          return new Promise(resolve => {
+            try {
+              const img = new Image();
+              let done = false;
+              const finish = (ok) => {
+                if (!done) {
+                  done = true;
+                  resolve(ok);
+                }
+              };
+              const timer = setTimeout(() => finish(false), timeoutMs);
+              img.onload = () => { clearTimeout(timer); finish(true); };
+              img.onerror = () => { clearTimeout(timer); finish(false); };
+
+              const bust = url.includes('?') ? '&' : '?';
+              img.src = `${url}${bust}t=${Date.now()}`;
+            } catch {
+              resolve(false);
+            }
+          });
+        };
+
+        const existingIds = new Set(slides.map(s => s?.fileId).filter(Boolean));
         const toAdd = [];
-        for (const f of requiredFiles) {
-          if (!existing.has(f.fileId)) {
+        for (const rf of requiredFiles) {
+          if (!existingIds.has(rf.fileId)) {
             const nextNumber = slides.length + toAdd.length + 1;
             toAdd.push({
               id: `slide-${Date.now()}-${Math.random().toString(36).slice(2,6)}`,
               name: `slide-${nextNumber}`,
               type: 'normal',
-              bgUrl: f.url,
-              previewDataUrl: f.url,
-              fileId: f.fileId
+              bgUrl: rf.url,
+              previewDataUrl: rf.url,
+              fileId: rf.fileId
             });
           }
         }
 
         if (toAdd.length > 0) {
-          const newSlides = slides.concat(toAdd);
-          await slidesServiceDM.createDataWithSlides(this.documentAddress, newSlides);
+          slides = slides.concat(toAdd);
+        }
+
+        const filtered = [];
+        for (const s of slides) {
+          const hasFileId = !!s?.fileId;
+          if (!hasFileId) {
+            filtered.push(s);
+            continue;
+          }
+
+          if (!requiredIdsSet.has(s.fileId)) {
+            continue;
+          }
+
+          const expectedUrl = urlById.get(s.fileId);
+          if (!expectedUrl) {
+            continue;
+          }
+
+          if (s.bgUrl !== expectedUrl || s.previewDataUrl !== expectedUrl) {
+            s.bgUrl = expectedUrl;
+            s.previewDataUrl = expectedUrl;
+          }
+
+          const ok = await validateImage(expectedUrl);
+          if (!ok) {
+            continue;
+          }
+
+          filtered.push(s);
+        }
+
+        const changed = filtered.length !== slides.length || toAdd.length > 0;
+        if (changed) {
+          await slidesServiceDM.createDataWithSlides(this.documentAddress, filtered);
         }
 
       } catch (e) {
