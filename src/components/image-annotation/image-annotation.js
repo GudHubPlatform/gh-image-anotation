@@ -52,7 +52,7 @@ class GhImageAnnotation extends GhHtmlElement {
     editorEl.addEventListener('editor:save', async (e) => {
       const { json, dataUrl, currentSlideIndex } = e.detail;
 
-      const slides = await slidesServiceDM.getDataWithSlides(this.documentAddress);
+      let slides = await slidesServiceDM.getDataWithSlides(this.documentAddress);
       if (!Array.isArray(slides)) return;
 
       if (currentSlideIndex !== -1) {
@@ -72,7 +72,8 @@ class GhImageAnnotation extends GhHtmlElement {
           name: newName,
           bgUrl: dataUrl,
           previewDataUrl: dataUrl,
-          type: newType
+          type: newType,
+          fileId: prev?.fileId ?? null
         };
 
         await slidesServiceDM.createDataWithSlides(this.documentAddress, slides);

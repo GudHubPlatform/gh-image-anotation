@@ -20,19 +20,14 @@ export class ViewerManager {
     this.onSlideEdit = onSlideEdit;
     this.storageKey = storageKey || 'slides';
 
-    this.slides = this.loadSlides();
+    this.slides = [];
     this.selectedSlide = null;
-    this.renderSlides();
 
-    if (Array.isArray(this.slides) && this.slides.length > 0) {
-      this.selectSlide(this.slides[0].id);
-    } else {
-      this.showEmptyPreview();
-    }
+    this.renderSlides();
   }
 
   async ensureSlidesLoaded() {
-    if (!Array.isArray(this.slides)) {
+    if (!Array.isArray(this.slides) || this.slides.length === 0) {
       this.slides = await this.loadSlides();
     }
     if (!Array.isArray(this.slides)) this.slides = [];
@@ -65,7 +60,7 @@ export class ViewerManager {
   }
 
   normalizeSlide(s, idx = 0) {
-    const allowed = ['id', 'name', 'bgUrl', 'previewDataUrl', 'type'];
+    const allowed = ['id', 'name', 'bgUrl', 'previewDataUrl', 'type', 'fileId'];
 
     let id = s?.id || this.genId();
     let name = s?.name || '';
@@ -89,7 +84,8 @@ export class ViewerManager {
       name,
       bgUrl: s?.bgUrl || null,
       previewDataUrl: s?.previewDataUrl || null,
-      type
+      type,
+      fileId: s?.fileId ?? null
     };
 
     const ordered = {};
@@ -110,7 +106,8 @@ export class ViewerManager {
       name: `slide-${n}--empty`,
       bgUrl: null,
       previewDataUrl: null,
-      type: 'empty'
+      type: 'empty',
+      fileId: null
     };
   }
 
@@ -119,7 +116,7 @@ export class ViewerManager {
     const newSlide = this.createSlide();
     this.slides.push(newSlide);
     await this.saveSlides();
-    this.renderSlides();
+    await this.renderSlides();
     if (this.slides.length === 1) {
       this.selectSlide(newSlide.id);
     }
@@ -127,6 +124,7 @@ export class ViewerManager {
   }
 
   async deleteSlide(id) {
+    await this.ensureSlidesLoaded();
     this.slides = this.slides.filter(slide => slide.id !== id);
     await this.saveSlides();
     await this.renderSlides();
@@ -152,12 +150,13 @@ export class ViewerManager {
       name: `slide-${n}--copy`,
       type: 'copy',
       bgUrl: original?.bgUrl || null,
-      previewDataUrl: original?.previewDataUrl || null
+      previewDataUrl: original?.previewDataUrl || null,
+      fileId: original?.fileId ?? null
     });
 
     this.slides.splice(originalIndex + 1, 0, copy);
     await this.saveSlides();
-    this.renderSlides();
+    await this.renderSlides();
 
     return copy;
   }
@@ -213,23 +212,24 @@ export class ViewerManager {
   }
 
   async renderSlides() {
-    this.slides = await this.loadSlides();
-    this.slides = (this.slides || []).map((s, idx) => this.normalizeSlide(s, idx));
+    const loaded = await this.loadSlides();
+    this.slides = (loaded || []).map((s, idx) => this.normalizeSlide(s, idx));
 
     this.slideList.innerHTML = '';
     this.slides.forEach(slide => {
       const slideEl = renderPreview(slide, {
         onDelete: () => this.deleteSlide(slide.id),
         onDuplicate: () => this.duplicateSlide(slide.id),
-        onSelect: () => this.selectSlide(slide.id),
-        onEdit: () => this.onSlideEdit?.(slide)
+        onSelect: () => this.selectSlide(slide.id)
       });
       slideEl.dataset.id = slide.id;
       this.slideList.appendChild(slideEl);
     });
 
-    if (this.selectedSlide) {
-      this.updateActiveSlideUI(this.selectedSlide.id);
+    if (!this.selectedSlide && this.slides.length > 0) {
+      this.selectSlide(this.slides[0].id);
+    } else if (this.slides.length === 0) {
+      this.showEmptyPreview();
     }
   }
 }

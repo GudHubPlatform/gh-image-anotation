@@ -52,7 +52,34 @@ class GhAnnotationsViewer extends HTMLElement {
           .filter(Boolean);
 
         const gudhubImagesDataFiles = await gudhub.getFiles(appId, idsArray);
-        const imagesUrl = gudhubImagesDataFiles?.map(file => file?.url);
+        const requiredFiles = (gudhubImagesDataFiles || []).map(f => ({
+          fileId: f?.id ?? f?.file_id,
+          url: f?.url ?? null
+        })).filter(x => x.fileId && x.url);
+
+        let slides = await slidesServiceDM.getDataWithSlides(this.documentAddress);
+        if (!Array.isArray(slides)) slides = [];
+
+        const existing = new Set(slides.map(s => s?.fileId).filter(Boolean));
+        const toAdd = [];
+        for (const f of requiredFiles) {
+          if (!existing.has(f.fileId)) {
+            const nextNumber = slides.length + toAdd.length + 1;
+            toAdd.push({
+              id: `slide-${Date.now()}-${Math.random().toString(36).slice(2,6)}`,
+              name: `slide-${nextNumber}`,
+              type: 'normal',
+              bgUrl: f.url,
+              previewDataUrl: f.url,
+              fileId: f.fileId
+            });
+          }
+        }
+
+        if (toAdd.length > 0) {
+          const newSlides = slides.concat(toAdd);
+          await slidesServiceDM.createDataWithSlides(this.documentAddress, newSlides);
+        }
 
       } catch (e) {
         console.error('Failed to bootstrap slides from Gudhub:', e);
@@ -74,7 +101,9 @@ class GhAnnotationsViewer extends HTMLElement {
       }
     });
 
-    addSlideBtn?.addEventListener('click', async () => { await this.manager.addSlide(); });
+    addSlideBtn?.addEventListener('click', async () => {
+      await this.manager.addSlide();
+    });
   }
 
   refreshSlides() {
