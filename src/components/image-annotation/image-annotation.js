@@ -49,16 +49,25 @@ class GhImageAnnotation extends GhHtmlElement {
       this.showViewer();
     });
 
-    editorEl.addEventListener('editor:save', (e) => {
+    editorEl.addEventListener('editor:save', async (e) => {
       const { json, dataUrl, currentSlideIndex, storageKey } = e.detail;
-      // const slides = JSON.parse(localStorage.getItem(storageKey || 'slides') || '[]');
-      const slides = slidesServiceDM.getDataWithSlides(this.documentAddress);
+      const slides = await slidesServiceDM.getDataWithSlides(this.documentAddress);
 
       if (currentSlideIndex !== -1) {
-        slides[currentSlideIndex].canvasJSON = json;
-        slides[currentSlideIndex].previewDataUrl = dataUrl;
-        // localStorage.setItem(storageKey || 'slides', JSON.stringify(slides));
-        slidesServiceDM.createDataWithSlides(this.documentAddress, slides);
+        const slide = slides[currentSlideIndex];
+        slide.canvasJSON = json;
+        slide.previewDataUrl = dataUrl;
+
+        if (slide.kind === 'empty') {
+          slide.kind = 'normal';
+          const base = Number.isInteger(slide.baseIndex)
+            ? slide.baseIndex
+            : (this._inferBaseIndexFromName(slide.name) || 1);
+          slide.name = `slide-${base}`;
+          slide.copyIndex = 0;
+        }
+
+        await slidesServiceDM.createDataWithSlides(this.documentAddress, slides);
       }
 
       this.showViewer();
@@ -69,6 +78,11 @@ class GhImageAnnotation extends GhHtmlElement {
 
     this.querySelector('#viewerWrapper').classList.add('hidden');
     editorWrapper.classList.remove('hidden');
+  }
+
+  _inferBaseIndexFromName(name = '') {
+    const m = name.match(/slide[-\s](\d+)/i);
+    return m ? parseInt(m[1], 10) : null;
   }
 
   showViewer() {

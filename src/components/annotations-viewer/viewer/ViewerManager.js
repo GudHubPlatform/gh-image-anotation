@@ -8,9 +8,9 @@ export class ViewerManager {
     this.fieldId = '863613';
     this.itemId = '4900015';
     this.documentAddress = {
-        app_id: this.appId,
-        item_id: this.itemId,
-        element_id: this.fieldId
+      app_id: this.appId,
+      item_id: this.itemId,
+      element_id: this.fieldId
     };
 
     this.slideList = slideList;
@@ -19,6 +19,7 @@ export class ViewerManager {
     this.onSlideSelect = onSlideSelect;
     this.onSlideEdit = onSlideEdit;
     this.storageKey = storageKey || 'slides';
+
     this.slides = this.loadSlides();
     this.selectedSlide = null;
     this.renderSlides();
@@ -30,12 +31,53 @@ export class ViewerManager {
     }
   }
 
-  saveSlides() {
-    // localStorage.setItem(this.storageKey, JSON.stringify(this.slides));
-    slidesServiceDM.createDataWithSlides(this.documentAddress, this.slides)
+  async ensureSlidesLoaded() {
+    if (!Array.isArray(this.slides)) {
+      this.slides = await this.loadSlides();
+    }
   }
 
-  addSlide() {
+  getNextBaseIndex() {
+    const arr = Array.isArray(this.slides) ? this.slides : [];
+    const indices = arr.map(s => s?.baseIndex).filter(n => Number.isInteger(n));
+    return indices.length ? Math.max(...indices) + 1 : 1;
+  }
+
+  getNextCopyIndex(baseIndex) {
+    const arr = Array.isArray(this.slides) ? this.slides : [];
+    const copies = arr.filter(s => s.baseIndex === baseIndex && s.kind === 'copy');
+    return copies.length ? Math.max(...copies.map(s => s.copyIndex || 0)) + 1 : 1;
+  }
+
+  genId() {
+    const rand = Math.random().toString(36).slice(2, 6);
+    return `slide-${Date.now()}-${rand}`;
+  }
+
+  _inferBaseIndexFromName(name = '') {
+    const m = name.match(/slide[-\s](\d+)/i);
+    return m ? parseInt(m[1], 10) : null;
+  }
+
+  saveSlides() {
+    slidesServiceDM.createDataWithSlides(this.documentAddress, this.slides);
+  }
+
+  createSlide() {
+    const baseIndex = this.getNextBaseIndex();
+    return {
+      id: this.genId(),
+      name: `slide-${baseIndex}--empty`,
+      kind: 'empty',
+      baseIndex,
+      copyIndex: 0,
+      canvasJSON: null,
+      previewDataUrl: null
+    };
+  }
+
+  async addSlide() {
+    await this.ensureSlidesLoaded();
     const newSlide = this.createSlide();
     this.slides.push(newSlide);
     this.saveSlides();
@@ -59,15 +101,25 @@ export class ViewerManager {
     }
   }
 
-  duplicateSlide(id) {
+  async duplicateSlide(id) {
+    await this.ensureSlidesLoaded();
     const originalIndex = this.slides.findIndex(s => s.id === id);
     if (originalIndex === -1) return null;
 
     const original = this.slides[originalIndex];
+    let baseIndex = Number.isInteger(original.baseIndex)
+      ? original.baseIndex
+      : this._inferBaseIndexFromName(original.name) ?? this.getNextBaseIndex();
+
+    const copyIndex = this.getNextCopyIndex(baseIndex);
+
     const copy = {
       ...original,
-      id: 'slide-' + Date.now(),
-      name: original.name + ' (copy)'
+      id: this.genId(),
+      name: `slide-${baseIndex}--copy-${copyIndex}`,
+      kind: 'copy',
+      baseIndex,
+      copyIndex
     };
 
     this.slides.splice(originalIndex + 1, 0, copy);
@@ -119,28 +171,33 @@ export class ViewerManager {
   }
 
   updateActiveSlideUI(activeId) {
-    const containers = this.slideList.querySelectorAll('.slide-preview-container');
+    const containers = this.slideList.querySelectorAll('.slide-preview-container, .sidebar__slide-preview-container');
     containers.forEach(el => {
       el.classList.toggle('active', el.dataset.id === activeId);
     });
   }
 
   async loadSlides() {
-    // return JSON.parse(localStorage.getItem(this.storageKey) || '[]');
     return await slidesServiceDM.getDataWithSlides(this.documentAddress);
-  }
-
-  createSlide() {
-    return {
-      id: 'slide-' + Date.now(),
-      name: 'Slide',
-      canvasJSON: null,
-      previewDataUrl: null
-    };
   }
 
   async renderSlides() {
     this.slides = await this.loadSlides();
+    this.slides = (this.slides || []).map((s, idx) => {
+      if (!s.kind) {
+        const hasContent = !!(s.canvasJSON || s.previewDataUrl);
+        const inferred = this._inferBaseIndexFromName(s.name) || (idx + 1);
+        return {
+          kind: hasContent ? 'normal' : 'empty',
+          baseIndex: inferred,
+          copyIndex: 0,
+          ...s,
+          name: hasContent ? `slide-${inferred}` : `slide-${inferred}--empty`
+        };
+      }
+      return s;
+    });
+
     this.slideList.innerHTML = '';
     this.slides.forEach(slide => {
       const slideEl = renderPreview(slide, {

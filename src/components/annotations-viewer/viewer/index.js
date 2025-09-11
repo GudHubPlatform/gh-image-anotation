@@ -14,43 +14,51 @@ const documentAddress = {
 const urlParams = new URLSearchParams(window.location.search);
 const slideId = urlParams.get('id');
 
-// let slides = JSON.parse(localStorage.getItem('slides') || '[]');
-let slides = slidesServiceDM.getDataWithSlides(documentAddress);
-let currentSlideIndex = slides.findIndex(s => s.id === slideId);
+(async () => {
+  let slides = await slidesServiceDM.getDataWithSlides(documentAddress);
+  let currentSlideIndex = slides.findIndex(s => s.id === slideId);
 
-const editor = new PaintEditor();
+  const editor = new PaintEditor();
 
-if (currentSlideIndex !== -1 && slides[currentSlideIndex].canvasJSON) {
-  setTimeout(() => {
-    editor.canvas.loadFromJSON(slides[currentSlideIndex].canvasJSON, () => {
-      editor.canvas.renderAll();
-    });
-  }, 100);
-}
+  if (currentSlideIndex !== -1 && slides[currentSlideIndex].canvasJSON) {
+    setTimeout(() => {
+      editor.canvas.loadFromJSON(slides[currentSlideIndex].canvasJSON, () => {
+        editor.canvas.renderAll();
+      });
+    }, 100);
+  }
 
-document.getElementById('cancelBtn').addEventListener('click', () => {
-  window.location.href = 'slides.html';
-});
-
-document.getElementById('finalSaveBtn').addEventListener('click', () => {
-  const json = editor.canvas.toJSON();
-  const dataUrl = editor.canvas.toDataURL({
-    format: "png",
-    quality: 1,
-    width: 1920,
-    height: 1080,
-    multiplier: 1
+  document.getElementById('cancelBtn').addEventListener('click', () => {
+    window.location.href = 'slides.html';
   });
 
-  if (currentSlideIndex !== -1) {
-    slides[currentSlideIndex].canvasJSON = json;
-    slides[currentSlideIndex].previewDataUrl = dataUrl;
+  document.getElementById('finalSaveBtn').addEventListener('click', async () => {
+    const json = editor.canvas.toJSON();
+    const dataUrl = editor.canvas.toDataURL({
+      format: "png",
+      quality: 1,
+      width: 1920,
+      height: 1080,
+      multiplier: 1
+    });
 
-    // localStorage.setItem('slides', JSON.stringify(slides));
-    slidesServiceDM.createDataWithSlides(documentAddress, slides);
+    if (currentSlideIndex !== -1) {
+      const slide = slides[currentSlideIndex];
+      slide.canvasJSON = json;
+      slide.previewDataUrl = dataUrl;
 
-    window.location.href = 'slides.html';
-  } else {
-    alert("Slide not found. Unable to save.");
-  }
-});
+      if (slide.kind === 'empty') {
+        slide.kind = 'normal';
+        const base = Number.isInteger(slide.baseIndex) ? slide.baseIndex : 1;
+        slide.name = `slide-${base}`;
+        slide.copyIndex = 0;
+      }
+
+      await slidesServiceDM.createDataWithSlides(documentAddress, slides);
+
+      window.location.href = 'slides.html';
+    } else {
+      alert("Slide not found. Unable to save.");
+    }
+  });
+})();
