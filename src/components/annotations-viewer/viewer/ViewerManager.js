@@ -100,7 +100,7 @@ export class ViewerManager {
   async saveSlides() {
     await this.ensureSlidesLoaded();
     const minimal = this.slides.map((s, i) => this.normalizeSlide(s, i));
-    slidesServiceDM.createDataWithSlides(this.documentAddress, minimal);
+    await slidesServiceDM.createDataWithSlides(this.documentAddress, minimal);
   }
 
   createSlide() {
@@ -126,10 +126,10 @@ export class ViewerManager {
     return newSlide;
   }
 
-  deleteSlide(id) {
+  async deleteSlide(id) {
     this.slides = this.slides.filter(slide => slide.id !== id);
-    this.saveSlides();
-    this.renderSlides();
+    await this.saveSlides();
+    await this.renderSlides();
     if (this.selectedSlide?.id === id) {
       if (this.slides.length > 0) {
         this.selectSlide(this.slides[0].id);
