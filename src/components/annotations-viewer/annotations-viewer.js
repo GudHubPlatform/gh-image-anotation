@@ -7,7 +7,7 @@ class GhAnnotationsViewer extends HTMLElement {
   constructor() {
     super();
 
-    //TODO: Need to remove this gudHub data below
+    // TODO: Need to remove this gudHub data below
     this.appId = '36609';
     this.fieldId = '863613';
     this.itemId = '4900015';
@@ -41,7 +41,6 @@ class GhAnnotationsViewer extends HTMLElement {
     const appId = this.getAttribute('data-app-id');
     const itemId = this.getAttribute('data-item-id')?.split('.')[1];
     const fieldId = this.getAttribute('data-field-id');
-    
     const storageKey = this.getAttribute('storage-key') || 'slides';
 
     if (appId) {
@@ -55,19 +54,6 @@ class GhAnnotationsViewer extends HTMLElement {
         const gudhubImagesDataFiles = await gudhub.getFiles(appId, idsArray);
         const imagesUrl = gudhubImagesDataFiles?.map(file => file?.url);
 
-        // const slides = imagesUrl.map((url, i) => ({
-        //   id: `slide-${Date.now()}-${i}`,
-        //   name: `slide-${i + 1}--empty`,
-        //   canvasJSON: null,
-        //   previewDataUrl: url,
-        //   bgUrl: url,
-        //   kind: 'empty',
-        //   baseIndex: i + 1,
-        //   copyIndex: 0
-        // })).filter(s => !!s.bgUrl);
-        // if (slides.length) {
-        //   slidesServiceDM.createDataWithSlides(this.documentAddress, slides);
-        // }
       } catch (e) {
         console.error('Failed to bootstrap slides from Gudhub:', e);
       }

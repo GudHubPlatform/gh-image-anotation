@@ -11,7 +11,7 @@ class GhImageAnnotation extends GhHtmlElement {
   constructor() {
     super();
 
-    //TODO: Need to remove this gudHub data below
+    // TODO: Need to remove this gudHub data below
     this.appId = '36609';
     this.fieldId = '863613';
     this.itemId = '4900015';
@@ -50,22 +50,30 @@ class GhImageAnnotation extends GhHtmlElement {
     });
 
     editorEl.addEventListener('editor:save', async (e) => {
-      const { json, dataUrl, currentSlideIndex, storageKey } = e.detail;
+      const { json, dataUrl, currentSlideIndex } = e.detail;
+
       const slides = await slidesServiceDM.getDataWithSlides(this.documentAddress);
+      if (!Array.isArray(slides)) return;
 
       if (currentSlideIndex !== -1) {
-        const slide = slides[currentSlideIndex];
-        slide.canvasJSON = json;
-        slide.previewDataUrl = dataUrl;
+        const prev = slides[currentSlideIndex];
 
-        if (slide.kind === 'empty') {
-          slide.kind = 'normal';
-          const base = Number.isInteger(slide.baseIndex)
-            ? slide.baseIndex
-            : (this._inferBaseIndexFromName(slide.name) || 1);
-          slide.name = `slide-${base}`;
-          slide.copyIndex = 0;
-        }
+        const parseNumber = (name = '') => {
+          const m = String(name).match(/slide-(\d+)/i);
+          return m ? parseInt(m[1], 10) : null;
+        };
+        const n = parseNumber(prev?.name) ?? (currentSlideIndex + 1);
+
+        const newType = prev?.type === 'copy' ? 'copy' : 'normal';
+        const newName = newType === 'copy' ? `slide-${n}--copy` : `slide-${n}`;
+
+        slides[currentSlideIndex] = {
+          id: prev?.id || `slide-${Date.now()}`,
+          name: newName,
+          bgUrl: dataUrl,
+          previewDataUrl: dataUrl,
+          type: newType
+        };
 
         await slidesServiceDM.createDataWithSlides(this.documentAddress, slides);
       }
@@ -78,11 +86,6 @@ class GhImageAnnotation extends GhHtmlElement {
 
     this.querySelector('#viewerWrapper').classList.add('hidden');
     editorWrapper.classList.remove('hidden');
-  }
-
-  _inferBaseIndexFromName(name = '') {
-    const m = name.match(/slide[-\s](\d+)/i);
-    return m ? parseInt(m[1], 10) : null;
   }
 
   showViewer() {

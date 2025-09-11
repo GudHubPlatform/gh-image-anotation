@@ -3,7 +3,7 @@ import { slidesServiceDM } from '../../../services/slidesServiceDM.js';
 
 export class ViewerManager {
   constructor({ slideList, previewWrapper, editBtn, onSlideSelect, onSlideEdit, storageKey }) {
-    //TODO: Need to remove this gudHub data below
+    // TODO: Need to remove this gudHub data below
     this.appId = '36609';
     this.fieldId = '863613';
     this.itemId = '4900015';
@@ -24,7 +24,7 @@ export class ViewerManager {
     this.selectedSlide = null;
     this.renderSlides();
 
-    if (this.slides.length > 0) {
+    if (Array.isArray(this.slides) && this.slides.length > 0) {
       this.selectSlide(this.slides[0].id);
     } else {
       this.showEmptyPreview();
@@ -35,18 +35,7 @@ export class ViewerManager {
     if (!Array.isArray(this.slides)) {
       this.slides = await this.loadSlides();
     }
-  }
-
-  getNextBaseIndex() {
-    const arr = Array.isArray(this.slides) ? this.slides : [];
-    const indices = arr.map(s => s?.baseIndex).filter(n => Number.isInteger(n));
-    return indices.length ? Math.max(...indices) + 1 : 1;
-  }
-
-  getNextCopyIndex(baseIndex) {
-    const arr = Array.isArray(this.slides) ? this.slides : [];
-    const copies = arr.filter(s => s.baseIndex === baseIndex && s.kind === 'copy');
-    return copies.length ? Math.max(...copies.map(s => s.copyIndex || 0)) + 1 : 1;
+    if (!Array.isArray(this.slides)) this.slides = [];
   }
 
   genId() {
@@ -54,25 +43,74 @@ export class ViewerManager {
     return `slide-${Date.now()}-${rand}`;
   }
 
-  _inferBaseIndexFromName(name = '') {
-    const m = name.match(/slide[-\s](\d+)/i);
+  parseNumber(name = '') {
+    const m = String(name).match(/slide-(\d+)/i);
     return m ? parseInt(m[1], 10) : null;
   }
 
-  saveSlides() {
-    slidesServiceDM.createDataWithSlides(this.documentAddress, this.slides);
+  isCopyName(name = '') {
+    return /--copy\b/i.test(name);
+  }
+
+  isEmptyName(name = '') {
+    return /--empty\b/i.test(name);
+  }
+
+  getNextNumber() {
+    const arr = Array.isArray(this.slides) ? this.slides : [];
+    const nums = arr
+      .map(s => this.parseNumber(s?.name))
+      .filter(n => Number.isInteger(n));
+    return nums.length ? Math.max(...nums) + 1 : 1;
+  }
+
+  normalizeSlide(s, idx = 0) {
+    const allowed = ['id', 'name', 'bgUrl', 'previewDataUrl', 'type'];
+
+    let id = s?.id || this.genId();
+    let name = s?.name || '';
+    let type = s?.type;
+
+    if (!type) {
+      if (this.isCopyName(name)) type = 'copy';
+      else if (this.isEmptyName(name)) type = 'empty';
+      else type = 'normal';
+    }
+
+    let n = this.parseNumber(name);
+    if (!Number.isInteger(n)) n = idx + 1;
+
+    if (type === 'empty') name = `slide-${n}--empty`;
+    else if (type === 'copy') name = `slide-${n}--copy`;
+    else name = `slide-${n}`;
+
+    const out = {
+      id,
+      name,
+      bgUrl: s?.bgUrl || null,
+      previewDataUrl: s?.previewDataUrl || null,
+      type
+    };
+
+    const ordered = {};
+    allowed.forEach(k => { ordered[k] = out[k] ?? null; });
+    return ordered;
+  }
+
+  async saveSlides() {
+    await this.ensureSlidesLoaded();
+    const minimal = this.slides.map((s, i) => this.normalizeSlide(s, i));
+    slidesServiceDM.createDataWithSlides(this.documentAddress, minimal);
   }
 
   createSlide() {
-    const baseIndex = this.getNextBaseIndex();
+    const n = this.getNextNumber();
     return {
       id: this.genId(),
-      name: `slide-${baseIndex}--empty`,
-      kind: 'empty',
-      baseIndex,
-      copyIndex: 0,
-      canvasJSON: null,
-      previewDataUrl: null
+      name: `slide-${n}--empty`,
+      bgUrl: null,
+      previewDataUrl: null,
+      type: 'empty'
     };
   }
 
@@ -80,7 +118,7 @@ export class ViewerManager {
     await this.ensureSlidesLoaded();
     const newSlide = this.createSlide();
     this.slides.push(newSlide);
-    this.saveSlides();
+    await this.saveSlides();
     this.renderSlides();
     if (this.slides.length === 1) {
       this.selectSlide(newSlide.id);
@@ -107,23 +145,18 @@ export class ViewerManager {
     if (originalIndex === -1) return null;
 
     const original = this.slides[originalIndex];
-    let baseIndex = Number.isInteger(original.baseIndex)
-      ? original.baseIndex
-      : this._inferBaseIndexFromName(original.name) ?? this.getNextBaseIndex();
+    const n = this.parseNumber(original?.name) ?? this.getNextNumber();
 
-    const copyIndex = this.getNextCopyIndex(baseIndex);
-
-    const copy = {
-      ...original,
+    const copy = this.normalizeSlide({
       id: this.genId(),
-      name: `slide-${baseIndex}--copy-${copyIndex}`,
-      kind: 'copy',
-      baseIndex,
-      copyIndex
-    };
+      name: `slide-${n}--copy`,
+      type: 'copy',
+      bgUrl: original?.bgUrl || null,
+      previewDataUrl: original?.previewDataUrl || null
+    });
 
     this.slides.splice(originalIndex + 1, 0, copy);
-    this.saveSlides();
+    await this.saveSlides();
     this.renderSlides();
 
     return copy;
@@ -164,10 +197,7 @@ export class ViewerManager {
         Please select or add a slide
       </div>
     `;
-
-    if (this.editBtn) {
-      this.editBtn.style.display = 'none';
-    }
+    if (this.editBtn) this.editBtn.style.display = 'none';
   }
 
   updateActiveSlideUI(activeId) {
@@ -178,25 +208,13 @@ export class ViewerManager {
   }
 
   async loadSlides() {
-    return await slidesServiceDM.getDataWithSlides(this.documentAddress);
+    const data = await slidesServiceDM.getDataWithSlides(this.documentAddress);
+    return Array.isArray(data) ? data : [];
   }
 
   async renderSlides() {
     this.slides = await this.loadSlides();
-    this.slides = (this.slides || []).map((s, idx) => {
-      if (!s.kind) {
-        const hasContent = !!(s.canvasJSON || s.previewDataUrl);
-        const inferred = this._inferBaseIndexFromName(s.name) || (idx + 1);
-        return {
-          kind: hasContent ? 'normal' : 'empty',
-          baseIndex: inferred,
-          copyIndex: 0,
-          ...s,
-          name: hasContent ? `slide-${inferred}` : `slide-${inferred}--empty`
-        };
-      }
-      return s;
-    });
+    this.slides = (this.slides || []).map((s, idx) => this.normalizeSlide(s, idx));
 
     this.slideList.innerHTML = '';
     this.slides.forEach(slide => {
