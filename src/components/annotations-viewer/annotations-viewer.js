@@ -39,7 +39,7 @@ class GhAnnotationsViewer extends HTMLElement {
     const editBtn = this.querySelector('#editBtn');
 
     const appId = this.getAttribute('data-app-id');
-    const itemId = this.getAttribute('data-item-id')?.split('.')[1];
+    const itemId = this.getAttribute('data-item-id')?.split('.')?.[1];
     const fieldId = this.getAttribute('data-field-id');
     const storageKey = this.getAttribute('storage-key') || 'slides';
 
@@ -104,7 +104,6 @@ class GhAnnotationsViewer extends HTMLElement {
             });
           }
         }
-
         if (toAdd.length > 0) {
           slides = slides.concat(toAdd);
         }
@@ -112,6 +111,7 @@ class GhAnnotationsViewer extends HTMLElement {
         const filtered = [];
         for (const s of slides) {
           const hasFileId = !!s?.fileId;
+
           if (!hasFileId) {
             filtered.push(s);
             continue;
@@ -123,6 +123,15 @@ class GhAnnotationsViewer extends HTMLElement {
 
           const expectedUrl = urlById.get(s.fileId);
           if (!expectedUrl) {
+            continue;
+          }
+
+          const looksEdited =
+            (typeof s?.previewDataUrl === 'string' && s.previewDataUrl.startsWith('data:')) ||
+            (typeof s?.bgUrl === 'string' && s.bgUrl.startsWith('data:'));
+
+          if (looksEdited) {
+            filtered.push(s);
             continue;
           }
 
@@ -143,7 +152,6 @@ class GhAnnotationsViewer extends HTMLElement {
         if (changed) {
           await slidesServiceDM.createDataWithSlides(this.documentAddress, filtered);
         }
-
       } catch (e) {
         console.error('Failed to bootstrap slides from Gudhub:', e);
       }
