@@ -1,43 +1,133 @@
-import { renderPreview, renderSlides } from './ViewerPreview.js';
+import { renderPreview } from './ViewerPreview.js';
+import { slidesServiceDM } from '../../../services/slidesServiceDM.js';
 
 export class ViewerManager {
   constructor({ slideList, previewWrapper, editBtn, onSlideSelect, onSlideEdit, storageKey }) {
+    // TODO: Need to remove this gudHub data below
+    this.appId = '36609';
+    this.fieldId = '863613';
+    this.itemId = '4900015';
+    this.documentAddress = {
+      app_id: this.appId,
+      item_id: this.itemId,
+      element_id: this.fieldId
+    };
+
     this.slideList = slideList;
     this.previewWrapper = previewWrapper;
     this.editBtn = editBtn;
     this.onSlideSelect = onSlideSelect;
     this.onSlideEdit = onSlideEdit;
     this.storageKey = storageKey || 'slides';
-    this.slides = this.loadSlides();
+
+    this.slides = [];
     this.selectedSlide = null;
+
     this.renderSlides();
+  }
 
-    if (this.slides.length > 0) {
-      this.selectSlide(this.slides[0].id);
-    } else {
-      this.showEmptyPreview();
+  async ensureSlidesLoaded() {
+    if (!Array.isArray(this.slides) || this.slides.length === 0) {
+      this.slides = await this.loadSlides();
     }
+    if (!Array.isArray(this.slides)) this.slides = [];
   }
 
-  saveSlides() {
-    localStorage.setItem(this.storageKey, JSON.stringify(this.slides));
+  genId() {
+    const rand = Math.random().toString(36).slice(2, 6);
+    return `slide-${Date.now()}-${rand}`;
   }
 
-  addSlide() {
+  parseNumber(name = '') {
+    const m = String(name).match(/slide-(\d+)/i);
+    return m ? parseInt(m[1], 10) : null;
+  }
+
+  isCopyName(name = '') {
+    return /--copy\b/i.test(name);
+  }
+
+  isEmptyName(name = '') {
+    return /--empty\b/i.test(name);
+  }
+
+  getNextNumber() {
+    const arr = Array.isArray(this.slides) ? this.slides : [];
+    const nums = arr
+      .map(s => this.parseNumber(s?.name))
+      .filter(n => Number.isInteger(n));
+    return nums.length ? Math.max(...nums) + 1 : 1;
+  }
+
+  normalizeSlide(s, idx = 0) {
+    const allowed = ['id', 'name', 'bgUrl', 'previewDataUrl', 'type', 'fileId'];
+
+    let id = s?.id || this.genId();
+    let name = s?.name || '';
+    let type = s?.type;
+
+    if (!type) {
+      if (this.isCopyName(name)) type = 'copy';
+      else if (this.isEmptyName(name)) type = 'empty';
+      else type = 'normal';
+    }
+
+    let n = this.parseNumber(name);
+    if (!Number.isInteger(n)) n = idx + 1;
+
+    if (type === 'empty') name = `slide-${n}--empty`;
+    else if (type === 'copy') name = `slide-${n}--copy`;
+    else name = `slide-${n}`;
+
+    const out = {
+      id,
+      name,
+      bgUrl: s?.bgUrl || null,
+      previewDataUrl: s?.previewDataUrl || null,
+      type,
+      fileId: s?.fileId ?? null
+    };
+
+    const ordered = {};
+    allowed.forEach(k => { ordered[k] = out[k] ?? null; });
+    return ordered;
+  }
+
+  async saveSlides() {
+    await this.ensureSlidesLoaded();
+    const minimal = this.slides.map((s, i) => this.normalizeSlide(s, i));
+    await slidesServiceDM.createDataWithSlides(this.documentAddress, minimal);
+  }
+
+  createSlide() {
+    const n = this.getNextNumber();
+    return {
+      id: this.genId(),
+      name: `slide-${n}--empty`,
+      bgUrl: null,
+      previewDataUrl: null,
+      type: 'empty',
+      fileId: null
+    };
+  }
+
+  async addSlide() {
+    await this.ensureSlidesLoaded();
     const newSlide = this.createSlide();
     this.slides.push(newSlide);
-    this.saveSlides();
-    this.renderSlides();
+    await this.saveSlides();
+    await this.renderSlides();
     if (this.slides.length === 1) {
       this.selectSlide(newSlide.id);
     }
     return newSlide;
   }
 
-  deleteSlide(id) {
+  async deleteSlide(id) {
+    await this.ensureSlidesLoaded();
     this.slides = this.slides.filter(slide => slide.id !== id);
-    this.saveSlides();
-    this.renderSlides();
+    await this.saveSlides();
+    await this.renderSlides();
     if (this.selectedSlide?.id === id) {
       if (this.slides.length > 0) {
         this.selectSlide(this.slides[0].id);
@@ -47,20 +137,26 @@ export class ViewerManager {
     }
   }
 
-  duplicateSlide(id) {
+  async duplicateSlide(id) {
+    await this.ensureSlidesLoaded();
     const originalIndex = this.slides.findIndex(s => s.id === id);
     if (originalIndex === -1) return null;
 
     const original = this.slides[originalIndex];
-    const copy = {
-      ...original,
-      id: 'slide-' + Date.now(),
-      name: original.name + ' (copy)'
-    };
+    const n = this.parseNumber(original?.name) ?? this.getNextNumber();
+
+    const copy = this.normalizeSlide({
+      id: this.genId(),
+      name: `slide-${n}--copy`,
+      type: 'copy',
+      bgUrl: original?.bgUrl || null,
+      previewDataUrl: original?.previewDataUrl || null,
+      fileId: original?.fileId ?? null
+    });
 
     this.slides.splice(originalIndex + 1, 0, copy);
-    this.saveSlides();
-    this.renderSlides();
+    await this.saveSlides();
+    await this.renderSlides();
 
     return copy;
   }
@@ -100,47 +196,40 @@ export class ViewerManager {
         Please select or add a slide
       </div>
     `;
-
-    if (this.editBtn) {
-      this.editBtn.style.display = 'none';
-    }
+    if (this.editBtn) this.editBtn.style.display = 'none';
   }
 
   updateActiveSlideUI(activeId) {
-    const containers = this.slideList.querySelectorAll('.slide-preview-container');
+    const containers = this.slideList.querySelectorAll('.slide-preview-container, .sidebar__slide-preview-container');
     containers.forEach(el => {
       el.classList.toggle('active', el.dataset.id === activeId);
     });
   }
 
-  loadSlides() {
-    return JSON.parse(localStorage.getItem(this.storageKey) || '[]');
+  async loadSlides() {
+    const data = await slidesServiceDM.getDataWithSlides(this.documentAddress);
+    return Array.isArray(data) ? data : [];
   }
 
-  createSlide() {
-    return {
-      id: 'slide-' + Date.now(),
-      name: 'Slide',
-      canvasJSON: null,
-      previewDataUrl: null
-    };
-  }
+  async renderSlides() {
+    const loaded = await this.loadSlides();
+    this.slides = (loaded || []).map((s, idx) => this.normalizeSlide(s, idx));
 
-  renderSlides() {
-    this.slides = this.loadSlides();
     this.slideList.innerHTML = '';
     this.slides.forEach(slide => {
       const slideEl = renderPreview(slide, {
         onDelete: () => this.deleteSlide(slide.id),
         onDuplicate: () => this.duplicateSlide(slide.id),
-        onSelect: () => this.selectSlide(slide.id),
-        onEdit: () => this.onSlideEdit?.(slide)
+        onSelect: () => this.selectSlide(slide.id)
       });
       slideEl.dataset.id = slide.id;
       this.slideList.appendChild(slideEl);
     });
-    if (this.selectedSlide) {
-      this.updateActiveSlideUI(this.selectedSlide.id);
+
+    if (!this.selectedSlide && this.slides.length > 0) {
+      this.selectSlide(this.slides[0].id);
+    } else if (this.slides.length === 0) {
+      this.showEmptyPreview();
     }
   }
 }

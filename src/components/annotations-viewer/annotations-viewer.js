@@ -1,10 +1,22 @@
 import html from './annotations-viewer.html';
 import styles from './annotations-viewer.scss';
 import { ViewerManager } from './viewer/ViewerManager.js';
+import { slidesServiceDM } from '../../services/slidesServiceDM.js';
 
 class GhAnnotationsViewer extends HTMLElement {
   constructor() {
     super();
+
+    // TODO: Need to remove this gudHub data below
+    this.appId = '36609';
+    this.fieldId = '863613';
+    this.itemId = '4900015';
+    this.documentAddress = {
+      app_id: this.appId,
+      item_id: this.itemId,
+      element_id: this.fieldId
+    };
+
     this.manager = null;
   }
 
@@ -27,32 +39,118 @@ class GhAnnotationsViewer extends HTMLElement {
     const editBtn = this.querySelector('#editBtn');
 
     const appId = this.getAttribute('data-app-id');
-    const itemId = this.getAttribute('data-item-id')?.split('.')[1];
+    const itemId = this.getAttribute('data-item-id')?.split('.')?.[1];
     const fieldId = this.getAttribute('data-field-id');
-    
     const storageKey = this.getAttribute('storage-key') || 'slides';
 
     if (appId) {
       try {
         const gudhubImagesFieldValue = await gudhub.getFieldValue(appId, itemId, fieldId);
-        const idsArray = gudhubImagesFieldValue
-          .split(",")
+        const idsArray = (gudhubImagesFieldValue || '')
+          .split(',')
           .map(id => id.trim())
           .filter(Boolean);
 
         const gudhubImagesDataFiles = await gudhub.getFiles(appId, idsArray);
-        const imagesUrl = gudhubImagesDataFiles?.map(file => file?.url);
 
-        const slides = imagesUrl.map((url, i) => ({
-          id: `slide-${Date.now()}-${i}`,
-          name: `Slide ${i + 1}`,
-          canvasJSON: null,
-          previewDataUrl: url,
-          bgUrl: url
-        })).filter(s => !!s.bgUrl);
+        const requiredFiles = (gudhubImagesDataFiles || [])
+          .map(f => ({
+            fileId: f?.id ?? f?.file_id,
+            url: f?.url ?? null
+          }))
+          .filter(x => x.fileId && x.url);
 
-        if (slides.length) {
-          localStorage.setItem(storageKey, JSON.stringify(slides));
+        const requiredIdsSet = new Set(requiredFiles.map(x => x.fileId));
+        const urlById = new Map(requiredFiles.map(x => [x.fileId, x.url]));
+
+        let slides = await slidesServiceDM.getDataWithSlides(this.documentAddress);
+        if (!Array.isArray(slides)) slides = [];
+
+        const validateImage = (url, timeoutMs = 5000) => {
+          return new Promise(resolve => {
+            try {
+              const img = new Image();
+              let done = false;
+              const finish = (ok) => {
+                if (!done) {
+                  done = true;
+                  resolve(ok);
+                }
+              };
+              const timer = setTimeout(() => finish(false), timeoutMs);
+              img.onload = () => { clearTimeout(timer); finish(true); };
+              img.onerror = () => { clearTimeout(timer); finish(false); };
+
+              const bust = url.includes('?') ? '&' : '?';
+              img.src = `${url}${bust}t=${Date.now()}`;
+            } catch {
+              resolve(false);
+            }
+          });
+        };
+
+        const existingIds = new Set(slides.map(s => s?.fileId).filter(Boolean));
+        const toAdd = [];
+        for (const rf of requiredFiles) {
+          if (!existingIds.has(rf.fileId)) {
+            const nextNumber = slides.length + toAdd.length + 1;
+            toAdd.push({
+              id: `slide-${Date.now()}-${Math.random().toString(36).slice(2,6)}`,
+              name: `slide-${nextNumber}`,
+              type: 'normal',
+              bgUrl: rf.url,
+              previewDataUrl: rf.url,
+              fileId: rf.fileId
+            });
+          }
+        }
+        if (toAdd.length > 0) {
+          slides = slides.concat(toAdd);
+        }
+
+        const filtered = [];
+        for (const s of slides) {
+          const hasFileId = !!s?.fileId;
+
+          if (!hasFileId) {
+            filtered.push(s);
+            continue;
+          }
+
+          if (!requiredIdsSet.has(s.fileId)) {
+            continue;
+          }
+
+          const expectedUrl = urlById.get(s.fileId);
+          if (!expectedUrl) {
+            continue;
+          }
+
+          const looksEdited =
+            (typeof s?.previewDataUrl === 'string' && s.previewDataUrl.startsWith('data:')) ||
+            (typeof s?.bgUrl === 'string' && s.bgUrl.startsWith('data:'));
+
+          if (looksEdited) {
+            filtered.push(s);
+            continue;
+          }
+
+          if (s.bgUrl !== expectedUrl || s.previewDataUrl !== expectedUrl) {
+            s.bgUrl = expectedUrl;
+            s.previewDataUrl = expectedUrl;
+          }
+
+          const ok = await validateImage(expectedUrl);
+          if (!ok) {
+            continue;
+          }
+
+          filtered.push(s);
+        }
+
+        const changed = filtered.length !== slides.length || toAdd.length > 0;
+        if (changed) {
+          await slidesServiceDM.createDataWithSlides(this.documentAddress, filtered);
         }
       } catch (e) {
         console.error('Failed to bootstrap slides from Gudhub:', e);
@@ -74,7 +172,9 @@ class GhAnnotationsViewer extends HTMLElement {
       }
     });
 
-    addSlideBtn?.addEventListener('click', () => this.manager.addSlide());
+    addSlideBtn?.addEventListener('click', async () => {
+      await this.manager.addSlide();
+    });
   }
 
   refreshSlides() {

@@ -11,27 +11,34 @@ export function setupLinkTools(editor) {
     const isLinkTextbox = (obj) =>
         !!obj && obj.type === 'textbox' && Object.prototype.hasOwnProperty.call(obj, 'customUrl');
 
+    const getCanvasRect = () => editor.canvas.upperCanvasEl.getBoundingClientRect();
+    const getCssScale = () => {
+        const rect = getCanvasRect();
+        const cssScaleX = rect.width / editor.canvas.getWidth();
+        const cssScaleY = rect.height / editor.canvas.getHeight();
+        return { cssScaleX, cssScaleY, rect };
+    };
+
     const getVPT = () => editor.canvas.viewportTransform || [1,0,0,1,0,0];
 
-    const canvasToScreen = (x, y, rect) => {
+    const canvasToScreen = (x, y) => {
         const [a,b,c,d,e,f] = getVPT();
-        const sx = a * x + c * y + e + rect.left;
-        const sy = b * x + d * y + f + rect.top;
-        return { x: sx, y: sy };
+        const { cssScaleX, cssScaleY, rect } = getCssScale();
+        const vx = a * x + c * y + e;
+        const vy = b * x + d * y + f;
+        return { x: vx * cssScaleX + rect.left, y: vy * cssScaleY + rect.top };
     };
 
     const getScreenBBox = (obj) => {
-        const rect = editor.canvas.upperCanvasEl.getBoundingClientRect();
         const corners = obj.getCoords(true);
-        const pts = corners.map(p => canvasToScreen(p.x, p.y, rect));
+        const pts = corners.map(p => canvasToScreen(p.x, p.y));
         const xs = pts.map(p => p.x);
         const ys = pts.map(p => p.y);
         return {
             left: Math.min(...xs),
             right: Math.max(...xs),
             top: Math.min(...ys),
-            bottom: Math.max(...ys),
-            rect
+            bottom: Math.max(...ys)
         };
     };
 
@@ -39,6 +46,7 @@ export function setupLinkTools(editor) {
         const toolbar = editor.root.querySelector('#linkToolbar');
         if (!toolbar || !textbox) return;
 
+        toolbar.style.position = 'fixed';
         toolbar.style.display = 'flex';
         toolbar.style.visibility = 'hidden';
         toolbar.style.maxWidth = 'calc(100vw - 16px)';
@@ -80,7 +88,7 @@ export function setupLinkTools(editor) {
         });
     };
 
-    const openModal = ({ mode, textbox }) => {
+    const openModal = ({ mode, textbox, onCancel }) => {
         if (editor._linkModalOpen) return;
         editor._linkModalOpen = true;
 
@@ -98,7 +106,6 @@ export function setupLinkTools(editor) {
             modal.style.display = 'none';
             editor._linkModalOpen = false;
             editor.unlockCanvasInteractions?.();
-
             editor.enableMouseTool?.();
             editor.setActiveButton?.('btn-mouse');
         };
@@ -107,56 +114,58 @@ export function setupLinkTools(editor) {
             const linkText = text.value?.trim();
             const linkUrl = url.value?.trim();
             if (!linkText || !linkUrl) {
+                if (mode === 'create' && textbox) {
+                    if (textbox.borderRect) editor.canvas.remove(textbox.borderRect);
+                    editor.canvas.remove(textbox);
+                    editor.canvas.requestRenderAll();
+                }
                 closeModal();
                 return;
             }
 
-            if (mode === 'edit' && textbox) {
-                textbox.set({ text: linkText });
-                textbox.customUrl = linkUrl;
-                editor.canvas.requestRenderAll();
-                editor.saveState?.();
-                editor.enableMouseTool();
-                editor.setActiveButton('btn-mouse');
-            } else {
-                const tb = new fabric.Textbox(linkText, {
-                    left: 150,
-                    top: 150,
-                    width: 200,
-                    fontSize: 18,
+            if (textbox) {
+                textbox.set({
+                    text: linkText,
                     fill: '#0000EE',
                     underline: true,
                     editable: true,
-                    cursorColor: '#0000EE',
-                    selectable: true,
-                    hasBorders: true,
-                    hasControls: true,
-                    hoverCursor: 'pointer',
-                    objectCaching: false,
-                    padding: 4
+                    cursorColor: '#0000EE'
                 });
-                tb.customUrl = linkUrl;
-                tb.on('mousedblclick', () => {
-                    if (tb.customUrl) window.open(tb.customUrl, '_blank');
-                });
-                editor.canvas.add(tb).setActiveObject(tb);
+                textbox.customUrl = linkUrl;
+
+                if (!textbox.__dblBound) {
+                    textbox.on('mousedblclick', () => {
+                        if (textbox.customUrl) window.open(textbox.customUrl, '_blank');
+                    });
+                    textbox.__dblBound = true;
+                }
+
+                editor.canvas.requestRenderAll();
                 editor.saveState?.();
-                editor.enableMouseTool();
-                editor.setActiveButton('btn-mouse');
             }
 
             closeModal();
         };
 
-        btnCancel.onclick = closeModal;
+        btnCancel.onclick = () => {
+            if (mode === 'create' && textbox) {
+                if (textbox.borderRect) editor.canvas.remove(textbox.borderRect);
+                editor.canvas.remove(textbox);
+                editor.canvas.requestRenderAll();
+            }
+            onCancel?.();
+            closeModal();
+        };
 
         modal.style.display = 'flex';
     };
 
     editor.addLink = () => {
         editor.disableDrawingMode?.();
+        editor.isLinkInsertMode = true;
+        editor.canvas.defaultCursor = 'crosshair';
         editor.lockCanvasInteractions?.();
-        openModal({ mode: 'create' });
+        editor.hideLinkToolbar?.();
     };
 
     editor.editLinkText = () => {
@@ -221,29 +230,28 @@ export function setupLinkTools(editor) {
         editor.hideLinkToolbar();
     });
 
-    const onTextboxMouseUp = (tb) => {
-        setTimeout(() => {
-            if (editor.canvas.getActiveObject() === tb) {
-                editor.showLinkToolbar(tb);
-            }
-        }, 0);
+    const bindLinkObject = (tb) => {
+        if (!isLinkTextbox(tb)) return;
+        tb.on('mouseup', () => {
+            setTimeout(() => {
+                if (editor.canvas.getActiveObject() === tb) {
+                    editor.showLinkToolbar(tb);
+                }
+            }, 0);
+        });
+        tb.on('removed', () => {
+            if (editor.activeLinkTextbox === tb) editor.hideLinkToolbar();
+        });
+        tb.on('moving', schedulePosition);
+        tb.on('scaling', schedulePosition);
+        tb.on('rotating', schedulePosition);
+        tb.on('modified', schedulePosition);
     };
 
     const originalAdd = editor.canvas.add.bind(editor.canvas);
     editor.canvas.add = (...args) => {
         const res = originalAdd(...args);
-        args.forEach(obj => {
-            if (isLinkTextbox(obj)) {
-                obj.on('mouseup', () => onTextboxMouseUp(obj));
-                obj.on('removed', () => {
-                    if (editor.activeLinkTextbox === obj) editor.hideLinkToolbar();
-                });
-                obj.on('moving', schedulePosition);
-                obj.on('scaling', schedulePosition);
-                obj.on('rotating', schedulePosition);
-                obj.on('modified', schedulePosition);
-            }
-        });
+        args.forEach(bindLinkObject);
         return res;
     };
 
@@ -260,4 +268,56 @@ export function setupLinkTools(editor) {
 
     window.addEventListener('resize', schedulePosition);
     window.addEventListener('scroll', schedulePosition, { passive: true });
+
+    const originalMouseDown = editor.onMouseDown;
+    editor.onMouseDown = function (e) {
+        if (editor.isLinkInsertMode && !e.target) {
+            const pointer = editor.canvas.getPointer(e.e);
+
+            const tb = new fabric.Textbox('',
+                {
+                    left: pointer.x,
+                    top: pointer.y,
+                    width: 200,
+                    fontSize: 18,
+                    fill: '#0000EE',
+                    underline: true,
+                    editable: true,
+                    cursorColor: '#0000EE',
+                    selectable: true,
+                    hasBorders: true,
+                    hasControls: true,
+                    hoverCursor: 'pointer',
+                    objectCaching: false,
+                    originX: 'center',
+                    originY: 'center',
+                    padding: 4
+                }
+            );
+            tb.customUrl = '';
+
+            editor.canvas.add(tb).setActiveObject(tb);
+            editor.canvas.bringToFront(tb);
+            bindLinkObject(tb);
+
+            openModal({
+                mode: 'create',
+                textbox: tb,
+                onCancel: () => {}
+            });
+
+            editor.isLinkInsertMode = false;
+            editor.canvas.defaultCursor = 'default';
+            editor.unlockCanvasInteractions?.();
+
+            const finishPlacement = () => {
+                editor.enableMouseTool?.();
+                editor.setActiveButton?.('btn-mouse');
+                editor.canvas.off('selection:cleared', finishPlacement);
+            };
+            editor.canvas.once('selection:cleared', finishPlacement);
+        } else {
+            originalMouseDown.call(editor, e);
+        }
+    };
 }

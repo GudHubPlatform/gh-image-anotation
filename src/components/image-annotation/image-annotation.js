@@ -5,9 +5,21 @@ import styles from "./image-annotation.scss";
 import '../annotations-viewer/annotations-viewer.js';
 import '../annotations-editor/annotations-editor.js';
 
+import { slidesServiceDM } from '../../services/slidesServiceDM.js';
+
 class GhImageAnnotation extends GhHtmlElement {
   constructor() {
     super();
+
+    // TODO: Need to remove this gudHub data below
+    this.appId = '36609';
+    this.fieldId = '863613';
+    this.itemId = '4900015';
+    this.documentAddress = {
+      app_id: this.appId,
+      item_id: this.itemId,
+      element_id: this.fieldId
+    };
   }
 
   onInit() {
@@ -37,14 +49,34 @@ class GhImageAnnotation extends GhHtmlElement {
       this.showViewer();
     });
 
-    editorEl.addEventListener('editor:save', (e) => {
-      const { json, dataUrl, currentSlideIndex, storageKey } = e.detail;
-      const slides = JSON.parse(localStorage.getItem(storageKey || 'slides') || '[]');
+    editorEl.addEventListener('editor:save', async (e) => {
+      const { json, dataUrl, currentSlideIndex } = e.detail;
+
+      let slides = await slidesServiceDM.getDataWithSlides(this.documentAddress);
+      if (!Array.isArray(slides)) return;
 
       if (currentSlideIndex !== -1) {
-        slides[currentSlideIndex].canvasJSON = json;
-        slides[currentSlideIndex].previewDataUrl = dataUrl;
-        localStorage.setItem(storageKey || 'slides', JSON.stringify(slides));
+        const prev = slides[currentSlideIndex];
+
+        const parseNumber = (name = '') => {
+          const m = String(name).match(/slide-(\d+)/i);
+          return m ? parseInt(m[1], 10) : null;
+        };
+        const n = parseNumber(prev?.name) ?? (currentSlideIndex + 1);
+
+        const newType = prev?.type === 'copy' ? 'copy' : 'normal';
+        const newName = newType === 'copy' ? `slide-${n}--copy` : `slide-${n}`;
+
+        slides[currentSlideIndex] = {
+          id: prev?.id || `slide-${Date.now()}`,
+          name: newName,
+          bgUrl: dataUrl,
+          previewDataUrl: dataUrl,
+          type: newType,
+          fileId: prev?.fileId ?? null
+        };
+
+        await slidesServiceDM.createDataWithSlides(this.documentAddress, slides);
       }
 
       this.showViewer();

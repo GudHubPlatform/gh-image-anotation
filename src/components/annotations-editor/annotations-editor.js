@@ -2,10 +2,22 @@ import html from './annotations-editor.html';
 import styles from './annotations-editor.scss';
 import PaintEditor from './editor/PaintEditor.js';
 import { resetHistory } from './editor/state/history.js';
+import { slidesServiceDM } from '../../services/slidesServiceDM.js';
 
 class GhAnnotationsEditor extends HTMLElement {
     constructor() {
         super();
+
+        //TODO: Need to remove this gudHub data below
+        this.appId = '36609';
+        this.fieldId = '863613';
+        this.itemId = '4900015';
+        this.documentAddress = {
+            app_id: this.appId,
+            item_id: this.itemId,
+            element_id: this.fieldId
+        };
+
         this.editor = null;
         this.currentSlideIndex = -1;
 
@@ -88,11 +100,11 @@ class GhAnnotationsEditor extends HTMLElement {
         }
     }
 
-    init() {
+    async init() {
         const slideId = this.getAttribute('slide-id');
         const storageKey = this.getAttribute('storage-key') || 'slides';
 
-        let slides = JSON.parse(localStorage.getItem(storageKey) || '[]');
+        let slides = await slidesServiceDM.getDataWithSlides(this.documentAddress);
         this.currentSlideIndex = slides.findIndex(s => s.id === slideId);
 
         this.editor = new PaintEditor(this);
