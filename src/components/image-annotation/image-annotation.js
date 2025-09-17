@@ -11,18 +11,24 @@ class GhImageAnnotation extends GhHtmlElement {
   constructor() {
     super();
 
-    // TODO: Need to remove this gudHub data below
-    this.appId = '36609';
-    this.fieldId = '863613';
-    this.itemId = '4900015';
+    this.appId = null;
+    this.fieldId = null;
+    this.itemId = null;
+    this.documentAddress = {};
+  }
+
+  onInit() {
+    const scope = this.scope;
+
+    this.appId = scope?.appId;
+    this.itemId = scope?.itemId;
+    this.fieldId = scope?.fieldId;
     this.documentAddress = {
       app_id: this.appId,
       item_id: this.itemId,
       element_id: this.fieldId
     };
-  }
 
-  onInit() {
     super.render(`
       <style>${styles}</style>
       ${html}
@@ -44,6 +50,10 @@ class GhImageAnnotation extends GhHtmlElement {
     const editorEl = document.createElement('gh-annotations-editor');
     editorEl.setAttribute('slide-id', slideId);
     editorEl.setAttribute('storage-key', 'slides');
+
+    editorEl.setAttribute('data-app-id', this.appId);
+    editorEl.setAttribute('data-item-id', this.itemId);
+    editorEl.setAttribute('data-field-id', this.fieldId);
 
     editorEl.addEventListener('editor:cancel', () => {
       this.showViewer();

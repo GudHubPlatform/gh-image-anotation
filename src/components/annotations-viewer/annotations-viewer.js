@@ -7,15 +7,10 @@ class GhAnnotationsViewer extends HTMLElement {
   constructor() {
     super();
 
-    // TODO: Need to remove this gudHub data below
-    this.appId = '36609';
-    this.fieldId = '863613';
-    this.itemId = '4900015';
-    this.documentAddress = {
-      app_id: this.appId,
-      item_id: this.itemId,
-      element_id: this.fieldId
-    };
+    this.appId = null;
+    this.fieldId = null;
+    this.itemId = null;
+    this.documentAddress = {};
 
     this.manager = null;
   }
@@ -30,6 +25,15 @@ class GhAnnotationsViewer extends HTMLElement {
       <style>${styles}</style>
       ${html}
     `;
+
+    this.appId = this.getAttribute('data-app-id') || '';
+    this.itemId = this.getAttribute('data-item-id') || '';
+    this.fieldId = this.getAttribute('data-field-id') || '';
+    this.documentAddress = {
+      app_id: this.appId,
+      item_id: this.itemId,
+      element_id: this.fieldId
+    };
   }
 
   async init() {
@@ -38,20 +42,17 @@ class GhAnnotationsViewer extends HTMLElement {
     const addSlideBtn = this.querySelector('#addSlideBtn');
     const editBtn = this.querySelector('#editBtn');
 
-    const appId = this.getAttribute('data-app-id');
-    const itemId = this.getAttribute('data-item-id')?.split('.')?.[1];
-    const fieldId = this.getAttribute('data-field-id');
     const storageKey = this.getAttribute('storage-key') || 'slides';
 
-    if (appId) {
+    if (this.appId) {
       try {
-        const gudhubImagesFieldValue = await gudhub.getFieldValue(appId, itemId, fieldId);
+        const gudhubImagesFieldValue = await gudhub.getFieldValue(this.appId, this.itemId, this.fieldId);
         const idsArray = (gudhubImagesFieldValue || '')
           .split(',')
           .map(id => id.trim())
           .filter(Boolean);
 
-        const gudhubImagesDataFiles = await gudhub.getFiles(appId, idsArray);
+        const gudhubImagesDataFiles = await gudhub.getFiles(this.appId, idsArray);
 
         const requiredFiles = (gudhubImagesDataFiles || [])
           .map(f => ({
@@ -157,7 +158,7 @@ class GhAnnotationsViewer extends HTMLElement {
       }
     }
 
-    this.manager = new ViewerManager({
+    this.manager = new ViewerManager(this.appId, this.itemId, this.fieldId, {
       slideList,
       previewWrapper,
       editBtn,

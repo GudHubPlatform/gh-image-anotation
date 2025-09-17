@@ -2,11 +2,10 @@ import { renderPreview } from './ViewerPreview.js';
 import { slidesServiceDM } from '../../../services/slidesServiceDM.js';
 
 export class ViewerManager {
-  constructor({ slideList, previewWrapper, editBtn, onSlideSelect, onSlideEdit, storageKey }) {
-    // TODO: Need to remove this gudHub data below
-    this.appId = '36609';
-    this.fieldId = '863613';
-    this.itemId = '4900015';
+  constructor(appId, fieldId, itemId, { slideList, previewWrapper, editBtn, onSlideSelect, onSlideEdit, storageKey }) {
+    this.appId = appId;
+    this.fieldId = fieldId;
+    this.itemId = itemId;
     this.documentAddress = {
       app_id: this.appId,
       item_id: this.itemId,
