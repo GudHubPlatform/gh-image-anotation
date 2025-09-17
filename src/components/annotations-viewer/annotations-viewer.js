@@ -158,7 +158,7 @@ class GhAnnotationsViewer extends HTMLElement {
       }
     }
 
-    this.manager = new ViewerManager(this.appId, this.itemId, this.fieldId, {
+    this.manager = new ViewerManager(this.appId, this.fieldId, this.itemId, {
       slideList,
       previewWrapper,
       editBtn,

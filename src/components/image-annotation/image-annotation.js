@@ -18,21 +18,19 @@ class GhImageAnnotation extends GhHtmlElement {
   }
 
   onInit() {
-    const scope = this.scope;
+    super.render(`
+      <style>${styles}</style>
+      ${html}
+    `);
 
-    this.appId = scope?.appId;
-    this.itemId = scope?.itemId;
-    this.fieldId = scope?.fieldId;
+    this.appId = this.getAttribute('app-id') || '';
+    this.itemId = this.getAttribute('item-id') || '';
+    this.fieldId = this.getAttribute('field-id') || '';
     this.documentAddress = {
       app_id: this.appId,
       item_id: this.itemId,
       element_id: this.fieldId
     };
-
-    super.render(`
-      <style>${styles}</style>
-      ${html}
-    `);
 
     const viewerEl = this.querySelector('gh-annotations-viewer');
     if (viewerEl) {
