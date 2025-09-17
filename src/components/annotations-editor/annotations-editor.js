@@ -8,15 +8,10 @@ class GhAnnotationsEditor extends HTMLElement {
     constructor() {
         super();
 
-        //TODO: Need to remove this gudHub data below
-        this.appId = '36609';
-        this.fieldId = '863613';
-        this.itemId = '4900015';
-        this.documentAddress = {
-            app_id: this.appId,
-            item_id: this.itemId,
-            element_id: this.fieldId
-        };
+        this.appId = null;
+        this.fieldId = null;
+        this.itemId = null;
+        this.documentAddress = {};
 
         this.editor = null;
         this.currentSlideIndex = -1;
@@ -38,6 +33,15 @@ class GhAnnotationsEditor extends HTMLElement {
             <style>${styles}</style>
             ${html}
         `;
+
+        this.appId = this.getAttribute('data-app-id') || '';
+        this.itemId = this.getAttribute('data-item-id') || '';
+        this.fieldId = this.getAttribute('data-field-id') || '';
+        this.documentAddress = {
+            app_id: this.appId,
+            item_id: this.itemId,
+            element_id: this.fieldId
+        };
     }
 
     _captureInitial() {

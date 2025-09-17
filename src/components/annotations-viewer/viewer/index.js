@@ -1,10 +1,11 @@
 import PaintEditor from './PaintEditor.js';
 import { slidesServiceDM } from '../../../services/slidesServiceDM.js';
 
-// TODO: Need to remove this gudHub data below
-const appId = '36609';
-const fieldId = '863613';
-const itemId = '4900015';
+const host = document.querySelector('gh-annotations-viewer');
+
+const appId = host?.getAttribute('data-app-id') || '';
+const itemId = host?.getAttribute('data-item-id') || '';
+const fieldId = host?.getAttribute('data-field-id') || '';
 const documentAddress = {
   app_id: appId,
   item_id: itemId,
