@@ -2,7 +2,7 @@ import { renderPreview } from './ViewerPreview.js';
 import { slidesServiceDM } from '../../../services/slidesServiceDM.js';
 
 export class ViewerManager {
-  constructor(appId, fieldId, itemId, { slideList, previewWrapper, editBtn, onSlideSelect, onSlideEdit, storageKey }) {
+  constructor(appId, fieldId, itemId, { slideList, previewWrapper, editBtn, onSlideSelect, onSlideEdit, storageKey, loader = null }) {
     this.appId = appId;
     this.fieldId = fieldId;
     this.itemId = itemId;
@@ -18,6 +18,7 @@ export class ViewerManager {
     this.onSlideSelect = onSlideSelect;
     this.onSlideEdit = onSlideEdit;
     this.storageKey = storageKey || 'slides';
+    this.loader = loader;
 
     this.slides = [];
     this.selectedSlide = null;
@@ -94,9 +95,14 @@ export class ViewerManager {
   }
 
   async saveSlides() {
-    await this.ensureSlidesLoaded();
-    const minimal = this.slides.map((s, i) => this.normalizeSlide(s, i));
-    await slidesServiceDM.createDataWithSlides(this.documentAddress, minimal);
+    this.loader?.show();
+    try {
+      await this.ensureSlidesLoaded();
+      const minimal = this.slides.map((s, i) => this.normalizeSlide(s, i));
+      await slidesServiceDM.createDataWithSlides(this.documentAddress, minimal);
+    } finally {
+      this.loader?.hide();
+    }
   }
 
   createSlide() {
@@ -113,54 +119,69 @@ export class ViewerManager {
   }
 
   async addSlide() {
-    await this.ensureSlidesLoaded();
-    const newSlide = this.createSlide();
-    this.slides.push(newSlide);
-    await this.saveSlides();
-    await this.renderSlides();
+    this.loader?.show();
+    try {
+      await this.ensureSlidesLoaded();
+      const newSlide = this.createSlide();
+      this.slides.push(newSlide);
+      await this.saveSlides();
+      await this.renderSlides();
 
-    this.selectSlide(newSlide.id);
+      this.selectSlide(newSlide.id);
 
-    return newSlide;
+      return newSlide;
+    } finally {
+      this.loader?.hide();
+    }
   }
 
   async deleteSlide(id) {
-    await this.ensureSlidesLoaded();
-    this.slides = this.slides.filter(slide => slide.id !== id);
-    await this.saveSlides();
-    await this.renderSlides();
-    if (this.selectedSlide?.id === id) {
-      if (this.slides.length > 0) {
-        this.selectSlide(this.slides[0].id);
-      } else {
-        this.showEmptyPreview();
+    this.loader?.show();
+    try {
+      await this.ensureSlidesLoaded();
+      this.slides = this.slides.filter(slide => slide.id !== id);
+      await this.saveSlides();
+      await this.renderSlides();
+      if (this.selectedSlide?.id === id) {
+        if (this.slides.length > 0) {
+          this.selectSlide(this.slides[0].id);
+        } else {
+          this.showEmptyPreview();
+        }
       }
+    } finally {
+      this.loader?.hide();
     }
   }
 
   async duplicateSlide(id) {
-    await this.ensureSlidesLoaded();
-    const originalIndex = this.slides.findIndex(s => s.id === id);
-    if (originalIndex === -1) return null;
+    this.loader?.show();
+    try {
+      await this.ensureSlidesLoaded();
+      const originalIndex = this.slides.findIndex(s => s.id === id);
+      if (originalIndex === -1) return null;
 
-    const original = this.slides[originalIndex];
-    const n = this.parseNumber(original?.name) ?? this.getNextNumber();
+      const original = this.slides[originalIndex];
+      const n = this.parseNumber(original?.name) ?? this.getNextNumber();
 
-    const copy = this.normalizeSlide({
-      id: this.genId(),
-      name: `slide-${n}--copy`,
-      type: 'copy',
-      bgUrl: original?.bgUrl || null,
-      previewDataUrl: original?.previewDataUrl || null,
-      fileId: original?.fileId ?? null,
-      canvasJSON: original?.canvasJSON ?? null
-    });
+      const copy = this.normalizeSlide({
+        id: this.genId(),
+        name: `slide-${n}--copy`,
+        type: 'copy',
+        bgUrl: original?.bgUrl || null,
+        previewDataUrl: original?.previewDataUrl || null,
+        fileId: original?.fileId ?? null,
+        canvasJSON: original?.canvasJSON ?? null
+      });
 
-    this.slides.splice(originalIndex + 1, 0, copy);
-    await this.saveSlides();
-    await this.renderSlides();
+      this.slides.splice(originalIndex + 1, 0, copy);
+      await this.saveSlides();
+      await this.renderSlides();
 
-    return copy;
+      return copy;
+    } finally {
+      this.loader?.hide();
+    }
   }
 
   async _generatePreviewFromCanvasJSON(canvasJSON) {
@@ -197,7 +218,12 @@ export class ViewerManager {
     if (slide.__previewCache) return slide.__previewCache;
 
     if (slide.canvasJSON) {
-      slide.__previewCache = await this._generatePreviewFromCanvasJSON(slide.canvasJSON);
+      this.loader?.show();
+      try {
+        slide.__previewCache = await this._generatePreviewFromCanvasJSON(slide.canvasJSON);
+      } finally {
+        this.loader?.hide();
+      }
       return slide.__previewCache;
     }
 
@@ -225,24 +251,22 @@ export class ViewerManager {
     return slide;
   }
 
-  showPreview(slide) {
+  async showPreview(slide) {
     this.previewWrapper.innerHTML = '';
-    (async () => {
-      const src = await this._ensurePreview(slide);
-      if (src) {
-        const img = document.createElement('img');
-        img.src = src;
-        this.previewWrapper.appendChild(img);
-      } else {
-        this.showEmptyPreview();
-      }
-    })();
+    const src = await this._ensurePreview(slide);
+    if (src) {
+      const img = document.createElement('img');
+      img.src = src;
+      this.previewWrapper.appendChild(img);
+    } else {
+      this.showEmptyPreview();
+    }
   }
 
   showEmptyPreview() {
     this.previewWrapper.innerHTML = `
       <div class="main__preview-wrapper--empty">
-        This slide is empty. Click <strong>Edit</strong> to start drawing or add a background.
+        This slide is empty. Click "Edit" to start drawing or add a background.
       </div>
     `;
 
@@ -262,28 +286,17 @@ export class ViewerManager {
   }
 
   async renderSlides() {
-    const loaded = await this.loadSlides();
-    this.slides = (loaded || []).map((s, idx) => this.normalizeSlide(s, idx));
+    await this.ensureSlidesLoaded();
 
     this.slideList.innerHTML = '';
     for (const slide of this.slides) {
-      try {
-        const src = await this._ensurePreview(slide);
-        if (src) slide.previewDataUrl = src;
-      } catch {}
-      const slideEl = renderPreview(slide, {
+      slide.__previewCache = await this._ensurePreview(slide);
+      const item = renderPreview(slide, {
         onDelete: () => this.deleteSlide(slide.id),
         onDuplicate: () => this.duplicateSlide(slide.id),
         onSelect: () => this.selectSlide(slide.id)
       });
-      this.slideList.appendChild(slideEl);
-    }
-
-    if (this.slides.length === 0) {
-      this.showEmptyPreview();
-      if (this.editBtn) this.editBtn.style.display = 'none';
-    } else if (!this.selectedSlide) {
-      this.selectSlide(this.slides[0].id);
+      this.slideList.appendChild(item);
     }
   }
 }

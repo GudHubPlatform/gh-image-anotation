@@ -1,3 +1,8 @@
+:host {
+  position: relative;
+  display: block;
+}
+
 body.gudhub input.link-modal__input {
   border-radius: 8px !important;
 }
@@ -308,4 +313,32 @@ gh-annotations-editor {
       pointer-events: none;
     }
   }
+}
+
+.gh-loader-overlay {
+  position: absolute;
+  inset: 0;
+  display: none;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.15);
+  z-index: 999;
+}
+
+.gh-loader-overlay--active { 
+  display: grid; 
+}
+
+.gh-loader-overlay__spinner {
+  width: 48px; 
+  height: 48px;
+  border: 4px solid rgba(0, 86, 255, 0.2);
+  border-top-color: #0056ff;
+  border-radius: 50%;
+  animation: gh-spin 1s linear infinite;
+}
+
+@keyframes gh-spin { 
+  to { 
+    transform: rotate(360deg); 
+  } 
 }

@@ -15,6 +15,7 @@ class GhAnnotationsViewer extends HTMLElement {
     this.documentAddress = {};
 
     this.manager = null;
+    this._loader = null;
   }
 
   connectedCallback() {
@@ -36,6 +37,22 @@ class GhAnnotationsViewer extends HTMLElement {
       item_id: this.itemId,
       element_id: this.fieldId
     };
+
+    this._ensureLoader();
+  }
+
+  _ensureLoader() {
+    if (this._loader) return this._loader;
+    const el = document.createElement('div');
+    el.className = 'gh-loader-overlay';
+    el.innerHTML = `<div class="gh-loader-overlay__spinner" role="status" aria-label="Loading"></div>`;
+    this.appendChild(el);
+    this._loader = {
+      show: () => el.classList.add('gh-loader-overlay--active'),
+      hide: () => el.classList.remove('gh-loader-overlay--active'),
+      el
+    };
+    return this._loader;
   }
 
   async init() {
@@ -45,6 +62,7 @@ class GhAnnotationsViewer extends HTMLElement {
     const editBtn = this.querySelector('#editBtn');
 
     const storageKey = this.getAttribute('storage-key') || 'slides';
+    const loader = this._ensureLoader();
 
     const validateImage = (url, timeoutMs = 5000) => {
       return new Promise(resolve => {
@@ -71,6 +89,7 @@ class GhAnnotationsViewer extends HTMLElement {
 
     const editorizeFromUrl = async (url) => {
       try {
+        loader.show();
         if (typeof window.fabric === 'undefined') {
           return { dataUrl: url, json: null };
         }
@@ -130,11 +149,15 @@ class GhAnnotationsViewer extends HTMLElement {
       } catch (e) {
         console.warn('Editorization via PaintEditor failed, fallback to original URL', e);
         return { dataUrl: url, json: null };
+      } finally {
+        loader.hide();
       }
     };
 
     if (this.appId) {
       try {
+        loader.show();
+
         const gudhubImagesFieldValue = await gudhub.getFieldValue(this.appId, this.itemId, this.fieldId);
         const idsArray = (gudhubImagesFieldValue || '')
           .split(',')
@@ -231,36 +254,31 @@ class GhAnnotationsViewer extends HTMLElement {
         if (changed) {
           await slidesServiceDM.createDataWithSlides(this.documentAddress, filtered);
         }
+
+        this.manager = new ViewerManager(this.appId, this.fieldId, this.itemId, {
+          slideList,
+          previewWrapper,
+          editBtn,
+          onSlideSelect: (slide) => {},
+          onSlideEdit: (slide) => {
+            this.dispatchEvent(new CustomEvent('edit', { detail: { slideId: slide.id }, bubbles: true, composed: true }));
+          },
+          storageKey,
+          loader
+        });
+
+        addSlideBtn?.addEventListener('click', async () => {
+          loader.show();
+          try { await this.manager.addSlide(); }
+          finally { loader.hide(); }
+        });
+
+        this.manager.selectSlide(this.manager?.slides?.[0]?.id);
       } catch (e) {
-        console.error('Failed to bootstrap slides from Gudhub:', e);
+        console.warn(e);
+      } finally {
+        loader.hide();
       }
-    }
-
-    this.manager = new ViewerManager(this.appId, this.fieldId, this.itemId, {
-      slideList,
-      previewWrapper,
-      editBtn,
-      storageKey,
-      onSlideSelect: () => {},
-      onSlideEdit: (slide) => {
-        this.dispatchEvent(new CustomEvent('edit', {
-          bubbles: true,
-          composed: true,
-          detail: { slideId: slide.id }
-        }));
-      }
-    });
-
-    addSlideBtn?.addEventListener('click', async () => {
-      await this.manager.addSlide();
-    });
-  }
-
-  async refreshSlides() {
-    try {
-      await this.manager?.renderSlides?.();
-    } catch (e) {
-      console.error('refreshSlides failed:', e);
     }
   }
 }

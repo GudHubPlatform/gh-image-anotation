@@ -34,9 +34,13 @@ class GhImageAnnotation extends GhHtmlElement {
 
     const viewerEl = this.querySelector('gh-annotations-viewer');
     if (viewerEl) {
+      const getViewerLoader = () => viewerEl?._loader || viewerEl?._ensureLoader?.();
       viewerEl.addEventListener('edit', (e) => {
         const { slideId } = e.detail;
-        this.showEditor(slideId);
+        const l = getViewerLoader();
+        l?.show();
+        try { this.showEditor(slideId); }
+        finally { l?.hide(); }
       });
     }
   }
@@ -60,8 +64,16 @@ class GhImageAnnotation extends GhHtmlElement {
     editorEl.addEventListener('editor:save', async (e) => {
       const { json, dataUrl, currentSlideIndex } = e.detail;
 
+      const viewer = this.querySelector('gh-annotations-viewer');
+      const loader = viewer?._loader || viewer?._ensureLoader?.();
+      loader?.show();
+
       let slides = await slidesServiceDM.getDataWithSlides(this.documentAddress);
-      if (!Array.isArray(slides)) return;
+      if (!Array.isArray(slides)) {
+        editorEl.dispatchEvent(new CustomEvent('editor:saved', { bubbles: true, composed: true }));
+        loader?.hide();
+        return;
+      }
 
       if (currentSlideIndex !== -1) {
         const prev = slides[currentSlideIndex];
@@ -87,8 +99,11 @@ class GhImageAnnotation extends GhHtmlElement {
         await slidesServiceDM.createDataWithSlides(this.documentAddress, slides);
       }
 
+      editorEl.dispatchEvent(new CustomEvent('editor:saved', { bubbles: true, composed: true }));
+
       this.showViewer();
-      this.querySelector('gh-annotations-viewer').refreshSlides();
+      this.querySelector('gh-annotations-viewer').refreshSlides?.();
+      loader?.hide();
     });
 
     editorWrapper.appendChild(editorEl);

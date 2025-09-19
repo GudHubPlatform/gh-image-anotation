@@ -23,11 +23,19 @@ class GhAnnotationsEditor extends HTMLElement {
     this._modalWired = false;
 
     this._escHandler = null;
+
+    this._pageLoader = null;
+    this._onSaved = null;
   }
 
   connectedCallback() {
     this.render();
     this.init();
+  }
+
+  disconnectedCallback() {
+    if (this._onSaved) this.removeEventListener('editor:saved', this._onSaved);
+    this._hidePageLoader(true);
   }
 
   render() {
@@ -44,6 +52,67 @@ class GhAnnotationsEditor extends HTMLElement {
       item_id: this.itemId,
       element_id: this.fieldId
     };
+
+    this._ensureGlobalLoaderStyles();
+  }
+
+  _ensureGlobalLoaderStyles() {
+    if (document.getElementById('gh-page-loader-styles')) return;
+    const st = document.createElement('style');
+    st.id = 'gh-page-loader-styles';
+    st.textContent = `
+      .gh-no-scroll { overflow: hidden !important; }
+      .gh-page-loader {
+        position: fixed; inset: 0;
+        display: none; place-items: center;
+        background: rgba(0,0,0,0.15);
+        z-index: 1000;
+      }
+      .gh-page-loader--active { display: grid; }
+      .gh-page-loader__spinner {
+        width: 56px; 
+        height: 56px;
+        border: 5px solid rgba(0,86,255,0.20);
+        border-top-color: #0056ff;
+        border-radius: 50%;
+        animation: gh-page-spin 1s linear infinite;
+      }
+      @keyframes gh-page-spin { to { transform: rotate(360deg); } }
+    `;
+    document.head.appendChild(st);
+  }
+
+  _ensurePageLoader() {
+    if (this._pageLoader?.el?.isConnected) return this._pageLoader;
+    const el = document.createElement('div');
+    el.className = 'gh-page-loader';
+    el.innerHTML = `<div class="gh-page-loader__spinner" role="status" aria-label="Loading"></div>`;
+    document.body.appendChild(el);
+    this._pageLoader = {
+      el,
+      show: () => {
+        el.classList.add('gh-page-loader--active');
+        document.documentElement.classList.add('gh-no-scroll');
+      },
+      hide: () => {
+        el.classList.remove('gh-page-loader--active');
+        document.documentElement.classList.remove('gh-no-scroll');
+      },
+      remove: () => {
+        try { el.remove(); } catch {}
+        document.documentElement.classList.remove('gh-no-scroll');
+      }
+    };
+    return this._pageLoader;
+  }
+
+  _showPageLoader() {
+    this._ensurePageLoader().show();
+  }
+  _hidePageLoader(remove = false) {
+    if (!this._pageLoader) return;
+    if (remove) this._pageLoader.remove();
+    else this._pageLoader.hide();
   }
 
   _captureInitial() {
@@ -111,9 +180,7 @@ class GhAnnotationsEditor extends HTMLElement {
     if (!c) return;
     try {
       c.getObjects().forEach(obj => {
-        if (obj.type === 'path') {
-          obj.set({ fill: null });
-        }
+        if (obj.type === 'path') obj.set({ fill: null });
       });
     } catch {}
   }
@@ -122,10 +189,18 @@ class GhAnnotationsEditor extends HTMLElement {
     const slideId = this.getAttribute('slide-id');
     const storageKey = this.getAttribute('storage-key') || 'slides';
 
+    this._showPageLoader();
+
     let slides = await slidesServiceDM.getDataWithSlides(this.documentAddress);
     this.currentSlideIndex = Array.isArray(slides) ? slides.findIndex(s => s.id === slideId) : -1;
 
     this.editor = new PaintEditor(this);
+
+    const finishInitial = () => {
+      resetHistory(this.editor);
+      this._captureInitial();
+      this._hidePageLoader();
+    };
 
     if (this.currentSlideIndex !== -1 && Array.isArray(slides)) {
       const slide = slides[this.currentSlideIndex];
@@ -134,27 +209,22 @@ class GhAnnotationsEditor extends HTMLElement {
         this.editor.isRestoring = true;
         this.editor.canvas.loadFromJSON(slide.canvasJSON, () => {
           this._sanitizeCanvasPaths();
-
           this.editor.canvas.renderAll();
           this.editor.isRestoring = false;
-          resetHistory(this.editor);
-          this._captureInitial();
+          finishInitial();
         });
       } else if (slide.bgUrl && typeof this.editor.setBackgroundImageFromURL === 'function') {
         this.editor.setBackgroundImageFromURL(slide.bgUrl);
-        resetHistory(this.editor);
         const once = () => {
           this.editor.canvas.off('after:render', once);
-          this._captureInitial();
+          finishInitial();
         };
         this.editor.canvas.on('after:render', once);
       } else {
-        resetHistory(this.editor);
-        setTimeout(() => this._captureInitial(), 0);
+        finishInitial();
       }
     } else {
-      resetHistory(this.editor);
-      setTimeout(() => this._captureInitial(), 0);
+      finishInitial();
     }
 
     this.querySelector('#cancelBtn')?.addEventListener('click', () => {
@@ -164,6 +234,9 @@ class GhAnnotationsEditor extends HTMLElement {
       }
       this.dispatchEvent(new CustomEvent('editor:cancel', { bubbles: true, composed: true }));
     });
+
+    this._onSaved = () => this._hidePageLoader();
+    this.addEventListener('editor:saved', this._onSaved);
 
     this.querySelector('#finalSaveBtn')?.addEventListener('click', () => {
       const json = this.editor.canvas.toJSON();
@@ -175,14 +248,11 @@ class GhAnnotationsEditor extends HTMLElement {
         multiplier: 1
       });
 
-      try {
-        this._initialCanvasJSON = JSON.stringify(json);
-      } catch {}
-
+      this._showPageLoader();
       this.dispatchEvent(new CustomEvent('editor:save', {
+        detail: { json, dataUrl, currentSlideIndex: this.currentSlideIndex },
         bubbles: true,
-        composed: true,
-        detail: { json, dataUrl, currentSlideIndex: this.currentSlideIndex }
+        composed: true
       }));
     });
   }
