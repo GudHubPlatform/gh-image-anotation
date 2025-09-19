@@ -3,11 +3,11 @@ export function renderPreview(slide, { onDelete, onDuplicate, onSelect }) {
   container.className = 'sidebar__slide-preview-container';
   container.dataset.id = slide.id;
 
-  if (slide?.previewDataUrl) {
+  const src = slide.__previewCache || null;
+
+  if (src) {
     const img = document.createElement('img');
-    img.src = slide.previewDataUrl.startsWith('data:')
-      ? slide.previewDataUrl
-      : slide.previewDataUrl + '?t=' + Date.now();
+    img.src = src;
     container.appendChild(img);
   } else {
     container.innerHTML = '<p>No preview</p>';
@@ -52,9 +52,7 @@ export function renderPreview(slide, { onDelete, onDuplicate, onSelect }) {
 
   container.appendChild(btnWrapper);
 
-  container.addEventListener('click', () => {
-    onSelect?.();
-  });
+  container.addEventListener('click', () => onSelect?.());
 
   return container;
 }

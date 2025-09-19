@@ -163,6 +163,52 @@ export class ViewerManager {
     return copy;
   }
 
+  async _generatePreviewFromCanvasJSON(canvasJSON) {
+    return new Promise((resolve, reject) => {
+      try {
+        const el = document.createElement('canvas');
+        el.width = 1920;
+        el.height = 1080;
+        const canvas = new fabric.Canvas(el, { selection: false });
+
+        canvas.loadFromJSON(canvasJSON, () => {
+          canvas.getObjects().forEach(obj => {
+            if (obj.type === 'path') obj.set({ fill: null });
+          });
+
+          canvas.renderAll();
+          const dataUrl = canvas.toDataURL({
+            format: 'png',
+            quality: 1,
+            width: 1920,
+            height: 1080,
+            multiplier: 1
+          });
+          canvas.dispose?.();
+          resolve(dataUrl);
+        });
+      } catch (e) {
+        reject(e);
+      }
+    });
+  }
+
+  async _ensurePreview(slide) {
+    if (slide.__previewCache) return slide.__previewCache;
+
+    if (slide.canvasJSON) {
+      slide.__previewCache = await this._generatePreviewFromCanvasJSON(slide.canvasJSON);
+      return slide.__previewCache;
+    }
+
+    if (slide.bgUrl) {
+      slide.__previewCache = slide.bgUrl;
+      return slide.__previewCache;
+    }
+
+    return null;
+  }
+
   selectSlide(id) {
     const slide = this.slides.find(s => s.id === id);
     if (!slide) return null;
@@ -181,15 +227,16 @@ export class ViewerManager {
 
   showPreview(slide) {
     this.previewWrapper.innerHTML = '';
-    if (slide.previewDataUrl) {
-      const img = document.createElement('img');
-      img.src = slide.previewDataUrl.startsWith('data:')
-        ? slide.previewDataUrl
-        : slide.previewDataUrl + '?t=' + Date.now();
-      this.previewWrapper.appendChild(img);
-    } else {
-      this.showEmptyPreview();
-    }
+    (async () => {
+      const src = await this._ensurePreview(slide);
+      if (src) {
+        const img = document.createElement('img');
+        img.src = src;
+        this.previewWrapper.appendChild(img);
+      } else {
+        this.showEmptyPreview();
+      }
+    })();
   }
 
   showEmptyPreview() {
@@ -218,14 +265,18 @@ export class ViewerManager {
     this.slides = (loaded || []).map((s, idx) => this.normalizeSlide(s, idx));
 
     this.slideList.innerHTML = '';
-    this.slides.forEach(slide => {
+    for (const slide of this.slides) {
+      try {
+        const src = await this._ensurePreview(slide);
+        if (src) slide.previewDataUrl = src;
+      } catch {}
       const slideEl = renderPreview(slide, {
         onDelete: () => this.deleteSlide(slide.id),
         onDuplicate: () => this.duplicateSlide(slide.id),
         onSelect: () => this.selectSlide(slide.id)
       });
       this.slideList.appendChild(slideEl);
-    });
+    }
 
     if (this.slides.length === 0) {
       this.showEmptyPreview();

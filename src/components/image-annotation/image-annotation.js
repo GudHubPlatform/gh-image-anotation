@@ -79,7 +79,6 @@ class GhImageAnnotation extends GhHtmlElement {
           id: prev?.id || `slide-${Date.now()}`,
           name: newName,
           bgUrl: dataUrl,
-          previewDataUrl: dataUrl,
           type: newType,
           fileId: prev?.fileId ?? null,
           canvasJSON: json

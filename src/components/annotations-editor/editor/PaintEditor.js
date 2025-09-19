@@ -12,425 +12,384 @@ import { setupToolbar } from './components/Toolbar.js';
 import { setupColorPalette } from './components/ColorPalette.js';
 import { setupLinkToolbar } from './components/LinkToolbar.js';
 
-function hex8ToRgba(hex) {
-  const h = String(hex || '').replace('#', '').trim();
-  if (h.length === 8) {
-    const r = parseInt(h.slice(0, 2), 16);
-    const g = parseInt(h.slice(2, 4), 16);
-    const b = parseInt(h.slice(4, 6), 16);
-    const a = parseInt(h.slice(6, 8), 16) / 255;
-    return `rgba(${r},${g},${b},${isNaN(a) ? 1 : a})`;
-  }
-
-  if (h.length === 4) {
-    const r = parseInt(h[0] + h[0], 16);
-    const g = parseInt(h[1] + h[1], 16);
-    const b = parseInt(h[2] + h[2], 16);
-    const a = parseInt(h[3] + h[3], 16) / 255;
-    return `rgba(${r},${g},${b},${isNaN(a) ? 1 : a})`;
-  }
-  return hex?.toString().startsWith('#') ? hex : `#${h}`;
-}
-
-function normalizeColor(color) {
-  if (!color) return '#000000';
-  const c = String(color).trim().toLowerCase();
-  if (c.startsWith('#') && (c.length === 9 || c.length === 5)) {
-    return hex8ToRgba(c);
-  }
-  return c;
-}
-
 export default class PaintEditor {
-  constructor(root) {
-    applyFabricOverrides();
+    constructor(root) {
+        applyFabricOverrides();
 
-    this.root = root;
+        this.root = root;
 
-    this.canvas = null;
-    this.pages = [];
-    this.currentPageIndex = -1;
+        this.canvas = null;
+        this.pages = [];
+        this.currentPageIndex = -1;
 
-    this.currentColor = normalizeColor('#ff0000ff');
-    this.isDrawingArrow = false;
-    this.isTextInsertMode = false;
-    this.arrowStart = null;
-    this.tempArrow = null;
-
-    this.restoreDepth = 0;
-
-    this._clipboard = null;
-
-    this.saveStateBound = this.saveState.bind(this);
-
-    this.init();
-    this.initSinglePage();
-    this.initUI();
-  }
-
-  init() {
-    this._onKeyDown = (e) => {
-      const platform = navigator.userAgentData?.platform || navigator.platform || '';
-      const isMac = /mac/i.test(platform);
-      const mod = isMac ? e.metaKey : e.ctrlKey;
-      if (!mod) return;
-
-      switch (e.code) {
-        case 'KeyC':
-          e.preventDefault();
-          this.copySelection();
-          break;
-        case 'KeyV':
-          e.preventDefault();
-          this.pasteSelection();
-          break;
-        case 'KeyZ':
-          e.preventDefault();
-          if (e.shiftKey) this.redo();
-          else this.undo();
-          break;
-        case 'KeyY':
-          e.preventDefault();
-          this.redo();
-          break;
-      }
-    };
-
-    window.addEventListener('keydown', this._onKeyDown);
-  }
-
-  initUI() {
-    setupToolbar(this, this.root);
-    setupColorPalette(this);
-    setupLinkToolbar(this);
-
-    const uploadBtn = this.root.querySelector('#upload-image-btn');
-    const fileInput = this.root.querySelector('#input-image');
-
-    if (uploadBtn && fileInput) {
-      uploadBtn.addEventListener('click', () => fileInput.click());
-      fileInput.addEventListener('change', this.uploadImage.bind(this));
-    }
-
-    this.setupActiveToolHighlighting();
-
-    window.addEventListener('resize', () => this.resizeCanvasContainer());
-  }
-
-  initSinglePage() {
-    const canvasWrapper = this.root.querySelector('#canvasWrapper');
-    const pageWrapper = document.createElement('div');
-    pageWrapper.className = 'canvas-page';
-    const canvasEl = document.createElement('canvas');
-    canvasEl.width = 1920;
-    canvasEl.height = 1080;
-    pageWrapper.appendChild(canvasEl);
-    canvasWrapper.appendChild(pageWrapper);
-
-    const canvas = new fabric.Canvas(canvasEl, { selection: true });
-    this.pages.push({
-      canvas,
-      element: canvasEl,
-      wrapper: pageWrapper,
-      history: [],
-      redoStack: []
-    });
-
-    pageWrapper.style.display = 'block';
-    this.setCanvas(canvas);
-    this.resizeCanvasContainer();
-    this.currentPageIndex = 0;
-    canvas.renderAll();
-
-    resetHistory(this);
-  }
-
-  setCanvas(canvas) {
-    this.canvas = canvas;
-    setupCanvasEvents(this);
-    setupDrawingTools(this);
-    setupArrowTools(this);
-    setupTextTools(this);
-    setupLinkTools(this);
-    setupBackgroundTools(this);
-
-    if (this.canvas.freeDrawingBrush) {
-      this.canvas.freeDrawingBrush.color = normalizeColor(this.currentColor);
-    }
-
-    this.canvas.on('object:modified', () => {
-      if (this.restoreDepth > 0) return;
-      this.saveState();
-    });
-    this.canvas.on('object:removed', () => {
-      if (this.restoreDepth > 0) return;
-      this.saveState();
-    });
-
-    this.canvas.on('path:created', (evt) => {
-      try {
-        const path = evt?.path || evt?.target;
-        if (path) {
-          path.set({ fill: null, stroke: normalizeColor(this.currentColor) });
-          path.setCoords?.();
-        }
-      } catch {}
-      if (this.restoreDepth > 0) return;
-      this.saveState();
-    });
-
-    this.canvas.on('object:added', (e) => {
-      if (this.restoreDepth > 0) return;
-      const t = e?.target;
-      if (t && t.type && t.type !== 'path') {
-        if (t.type === 'line') {
-          t.set({ stroke: normalizeColor(this.currentColor) });
-        } else if (t.type === 'polygon') {
-          t.set({ fill: normalizeColor(this.currentColor) });
-        } else if (t.type === 'textbox') {
-          const c = normalizeColor(this.currentColor);
-          t.set({ fill: c, cursorColor: c });
-        }
-      }
-      if (t?.type !== 'path') this.saveState();
-    });
-  }
-
-  saveState() { 
-    saveState(this); 
-  }
-
-  undo() {
-    undo(this);
-    this.setActiveButton?.('btn-undo');
-  }
-
-  redo() {
-    redo(this);
-    this.setActiveButton?.('btn-redo');
-  }
-
-  clearCanvas() {
-    clearCanvas(this);
-  }
-
-  saveImage() { 
-    saveImage(this); 
-  }
-
-  resizeCanvasContainer() {
-    const canvasElements = this.root.querySelectorAll('canvas');
-    const canvasContainer = this.root.querySelector('.canvas-container');
-    if (!canvasContainer) return;
-
-    const originalWidth = 1920;
-    const originalHeight = 1080;
-    const windowWidth = window.innerWidth;
-
-    const scale = windowWidth / originalWidth;
-    const newWidth = originalWidth * scale;
-    const newHeight = originalHeight * scale;
-
-    canvasElements.forEach((el) => {
-      el.style.height = `${newHeight}px`;
-      el.style.width = `${newWidth}px`;
-    });
-
-    canvasContainer.style.width = `${newWidth}px`;
-    canvasContainer.style.height = `${newHeight}px`;
-  }
-
-  updateActiveObjectColor(color) {
-    const normalized = normalizeColor(color || this.currentColor);
-    this.currentColor = normalized;
-
-    const activeObject = this.canvas.getActiveObject();
-    if (!activeObject) return;
-
-    if (activeObject.type === 'group') {
-      activeObject._objects.forEach(obj => {
-        if (obj.type === 'line') obj.set({ stroke: normalized });
-        if (obj.type === 'polygon') obj.set({ fill: normalized });
-      });
-    } else if (activeObject.type === 'textbox') {
-      activeObject.set({ fill: normalized, cursorColor: normalized });
-    } else if (activeObject.type === 'line' || activeObject.type === 'path') {
-      if (activeObject.type === 'path') activeObject.set({ fill: null });
-      activeObject.set({ stroke: normalized });
-    } else if (activeObject.type === 'rect' || activeObject.type === 'circle' || activeObject.type === 'triangle') {
-      activeObject.set({ fill: normalized });
-    }
-
-    this.canvas.requestRenderAll();
-  }
-
-  enableMouseTool() {
-    this.isDrawingArrow = false;
-    this.isTextInsertMode = false;
-
-    this.canvas.isDrawingMode = false;
-    this.canvas.selection = true;
-
-    this.canvas.forEachObject(obj => {
-      obj.selectable = true;
-      obj.evented = true;
-    });
-
-    this.canvas.discardActiveObject();
-    this.canvas.requestRenderAll();
-  }
-
-  setupActiveToolHighlighting() {
-    const buttons = this.root.querySelectorAll('.toolbar__action-buttons button');
-
-    buttons.forEach(btn => {
-      const tool = btn.id;
-
-      btn.addEventListener('click', () => {
-        if (tool === 'btn-undo' || tool === 'btn-redo') {
-          buttons.forEach(b => b.classList.remove('active'));
-          btn.classList.add('active');
-
-          setTimeout(() => {
-            btn.classList.remove('active');
-            const mouseBtn = this.root.querySelector('#btn-mouse');
-            if (mouseBtn) {
-              mouseBtn.classList.add('active');
-            }
-            this.enableMouseTool?.();
-            this.setActiveButton?.('btn-mouse');
-          }, 250);
-
-          return;
-        }
-
-        buttons.forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-
-        if (tool !== 'btn-mouse') {
-          this.activateToolOnce(tool);
-        } else {
-          this.enableMouseTool();
-        }
-      });
-    });
-
-    const mouseBtn = this.root.querySelector('#btn-mouse');
-    if (mouseBtn) {
-      mouseBtn.classList.add('active');
-      this.enableMouseTool();
-    }
-  }
-
-  activateToolOnce(toolId) {
-    switch (toolId) {
-      case 'btn-draw': {
+        this.currentColor = '#ff0000ff';
         this.isDrawingArrow = false;
         this.isTextInsertMode = false;
-        this.canvas.isDrawingMode = true;
-        this.canvas.selection = false;
-        if (this.canvas.freeDrawingBrush) {
-          this.canvas.freeDrawingBrush.color = normalizeColor(this.currentColor);
-        }
-        break;
-      }
+        this.arrowStart = null;
+        this.tempArrow = null;
 
-      case 'btn-add-arrow':
-        this.isDrawingArrow = true;
-        this.canvas.isDrawingMode = false;
-        this.canvas.selection = false;
-        break;
+        this.restoreDepth = 0;
 
-      case 'btn-add-text':
-        this.isTextInsertMode = true;
-        this.canvas.isDrawingMode = false;
-        this.canvas.selection = false;
-        break;
+        this._clipboard = null;
 
-      case 'btn-add-link':
-        this.canvas.isDrawingMode = false;
-        this.addLink?.();
-        break;
+        this.saveStateBound = this.saveState.bind(this);
 
-      default:
-        break;
+        this.init();
+        this.initSinglePage();
+        this.initUI();
     }
-  }
 
-  setActiveButton(buttonId) {
-    const buttons = this.root.querySelectorAll('.toolbar__action-buttons button');
-    buttons.forEach(b => b.classList.remove('active'));
-    const btn = this.root.querySelector(`#${buttonId}`);
-    btn?.classList.add('active');
-  }
+    init() {
+        this._onKeyDown = (e) => {
+            const platform = navigator.userAgentData?.platform || navigator.platform || '';
+            const isMac = /mac/i.test(platform);
+            const mod = isMac ? e.metaKey : e.ctrlKey;
+            if (!mod) return;
 
-  uploadImage(e) {
-    const file = e?.target?.files?.[0];
-    if (!file) return;
+            switch (e.code) {
+                case 'KeyC':
+                    e.preventDefault();
+                    this.copySelection();
+                    break;
+                case 'KeyV':
+                    e.preventDefault();
+                    this.pasteSelection();
+                    break;
+                case 'KeyZ':
+                    e.preventDefault();
+                    if (e.shiftKey) this.redo();
+                    else this.undo();
+                    break;
+                case 'KeyY':
+                    e.preventDefault();
+                    this.redo();
+                    break;
+            }
+        };
 
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      fabric.Image.fromURL(evt.target.result, (img) => {
-        const cw = this.canvas.getWidth();
-        const ch = this.canvas.getHeight();
+        window.addEventListener('keydown', this._onKeyDown);
+    }
 
-        img.set({
-          left: cw / 2,
-          top: ch / 2,
-          originX: 'center',
-          originY: 'center',
-          selectable: true,
-          objectCaching: false
+    initUI() {
+        setupToolbar(this, this.root);
+        setupColorPalette(this);
+        setupLinkToolbar(this);
+
+        const uploadBtn = this.root.querySelector('#upload-image-btn');
+        const fileInput = this.root.querySelector('#input-image');
+
+        if (uploadBtn && fileInput) {
+            uploadBtn.addEventListener('click', () => fileInput.click());
+            fileInput.addEventListener('change', this.uploadImage.bind(this));
+        }
+
+        this.setupActiveToolHighlighting();
+
+        window.addEventListener('resize', () => this.resizeCanvasContainer());
+    }
+
+    initSinglePage() {
+        const canvasWrapper = this.root.querySelector('#canvasWrapper');
+        const pageWrapper = document.createElement('div');
+        pageWrapper.className = 'canvas-page';
+        const canvasEl = document.createElement('canvas');
+        canvasEl.width = 1920;
+        canvasEl.height = 1080;
+        pageWrapper.appendChild(canvasEl);
+        canvasWrapper.appendChild(pageWrapper);
+
+        const canvas = new fabric.Canvas(canvasEl, { selection: true });
+        this.pages.push({
+            canvas,
+            element: canvasEl,
+            wrapper: pageWrapper,
+            history: [],
+            redoStack: []
         });
 
-        const maxW = cw * 0.9;
-        const maxH = ch * 0.9;
-        const scale = Math.min(
-          1,
-          maxW / (img.width || maxW),
-          maxH / (img.height || maxH)
-        );
-        if (scale < 1) img.scale(scale);
+        pageWrapper.style.display = 'block';
+        this.setCanvas(canvas);
+        this.resizeCanvasContainer();
+        this.currentPageIndex = 0;
+        canvas.renderAll();
 
-        this.canvas.add(img);
-        this.canvas.setActiveObject(img);
+        resetHistory(this);
+    }
+
+    setCanvas(canvas) {
+        this.canvas = canvas;
+        setupCanvasEvents(this);
+        setupDrawingTools(this);
+        setupArrowTools(this);
+        setupTextTools(this);
+        setupLinkTools(this);
+        setupBackgroundTools(this);
+
+        this.canvas.on('object:modified', () => {
+            if (this.restoreDepth > 0) return;
+            this.saveState();
+        });
+
+        this.canvas.on('object:removed', () => {
+            if (this.restoreDepth > 0) return;
+            this.saveState();
+        });
+
+        this.canvas.on('path:created', (e) => {
+            const path = e?.path || e?.target;
+            if (path) {
+                path.set({
+                    fill: null,
+                    stroke: this.currentColor,
+                    strokeUniform: true
+                });
+            }
+            if (this.restoreDepth > 0) return;
+            this.saveState();
+        });
+
+        this.canvas.on('object:added', (e) => {
+            if (this.restoreDepth > 0) return;
+            if (e?.target?.type === 'path') return;
+            this.saveState();
+        });
+    }
+
+    saveState() { 
+        saveState(this); 
+    }
+
+    undo() {
+        undo(this);
+        this.setActiveButton?.('btn-undo');
+    }
+
+    redo() {
+        redo(this);
+        this.setActiveButton?.('btn-redo');
+    }
+
+    clearCanvas() {
+        clearCanvas(this);
+    }
+
+    saveImage() { 
+        saveImage(this); 
+    }
+
+    resizeCanvasContainer() {
+        const canvasElements = this.root.querySelectorAll('canvas');
+        const canvasContainer = this.root.querySelector('.canvas-container');
+        if (!canvasContainer) return;
+
+        const originalWidth = 1920;
+        const originalHeight = 1080;
+        const windowWidth = window.innerWidth;
+
+        const scale = windowWidth / originalWidth;
+        const newWidth = originalWidth * scale;
+        const newHeight = originalHeight * scale;
+
+        canvasElements.forEach((el) => {
+            el.style.height = `${newHeight}px`;
+            el.style.width = `${newWidth}px`;
+        });
+
+        canvasContainer.style.width = `${newWidth}px`;
+        canvasContainer.style.height = `${newHeight}px`;
+    }
+
+    updateActiveObjectColor(color) {
+        const activeObject = this.canvas.getActiveObject();
+        if (!activeObject) return;
+
+        if (activeObject.type === 'group') {
+            activeObject._objects.forEach(obj => {
+                if (obj.type === 'line') obj.set({ stroke: color });
+                if (obj.type === 'polygon') obj.set({ fill: color });
+            });
+        } else if (activeObject.type === 'textbox') {
+            activeObject.set({ fill: color, cursorColor: color });
+        } else if (activeObject.type === 'line' || activeObject.type === 'path') {
+            activeObject.set({ stroke: color });
+        } else if (activeObject.type === 'rect' || activeObject.type === 'circle' || activeObject.type === 'triangle') {
+            activeObject.set({ fill: color });
+        }
+
         this.canvas.requestRenderAll();
+    }
 
-        this.enableMouseTool();
-        this.setActiveButton('btn-mouse');
-      }, { crossOrigin: 'anonymous' });
-    };
-    reader.readAsDataURL(file);
+    enableMouseTool() {
+        this.isDrawingArrow = false;
+        this.isTextInsertMode = false;
 
-    if (e?.target) e.target.value = '';
-  }
+        this.canvas.isDrawingMode = false;
+        this.canvas.selection = true;
 
-  copySelection() {
-    const active = this.canvas.getActiveObject();
-    if (!active) return;
-    active.clone((cloned) => {
-      this._clipboard = cloned;
-    });
-  }
+        this.canvas.forEachObject(obj => {
+            obj.selectable = true;
+            obj.evented = true;
+        });
 
-  pasteSelection() {
-    if (!this._clipboard) return;
-    this._clipboard.clone((clonedObj) => {
-      this.canvas.discardActiveObject();
-      clonedObj.set({
-        left: (clonedObj.left || 0) + 10,
-        top: (clonedObj.top || 0) + 10,
-        evented: true
-      });
+        this.canvas.discardActiveObject();
+        this.canvas.requestRenderAll();
+    }
 
-      if (clonedObj.type === 'path') {
-        clonedObj.set({ fill: null, stroke: normalizeColor(this.currentColor) });
-      }
+    setupActiveToolHighlighting() {
+        const buttons = this.root.querySelectorAll('.toolbar__action-buttons button');
 
-      this.canvas.add(clonedObj);
-      this.canvas.setActiveObject(clonedObj);
-      this.canvas.requestRenderAll();
-      this.saveState();
-    });
-  }
+        buttons.forEach(btn => {
+            const tool = btn.id;
+
+            btn.addEventListener('click', () => {
+                if (tool === 'btn-undo' || tool === 'btn-redo') {
+                    buttons.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+
+                    setTimeout(() => {
+                        btn.classList.remove('active');
+                        const mouseBtn = this.root.querySelector('#btn-mouse');
+                        if (mouseBtn) {
+                            mouseBtn.classList.add('active');
+                        }
+                        this.enableMouseTool?.();
+                        this.setActiveButton?.('btn-mouse');
+                    }, 250);
+
+                    return;
+                }
+
+                buttons.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+
+                if (tool !== 'btn-mouse') {
+                    this.activateToolOnce(tool);
+                } else {
+                    this.enableMouseTool();
+                }
+            });
+        });
+
+        const mouseBtn = this.root.querySelector('#btn-mouse');
+        if (mouseBtn) {
+            mouseBtn.classList.add('active');
+            this.enableMouseTool();
+        }
+    }
+
+    activateToolOnce(toolId) {
+        switch (toolId) {
+            case 'btn-draw':
+                this.isDrawingArrow = false;
+                this.isTextInsertMode = false;
+                this.canvas.isDrawingMode = true;
+                this.canvas.selection = false;
+                if (this.canvas.freeDrawingBrush) {
+                    this.canvas.freeDrawingBrush.color = this.currentColor;
+                }
+                break;
+
+            case 'btn-add-arrow':
+                this.isDrawingArrow = true;
+                this.canvas.isDrawingMode = false;
+                this.canvas.selection = false;
+                break;
+
+            case 'btn-add-text':
+                this.isTextInsertMode = true;
+                this.canvas.isDrawingMode = false;
+                this.canvas.selection = false;
+                break;
+
+            case 'btn-add-link':
+                this.canvas.isDrawingMode = false;
+                this.addLink?.();
+                break;
+
+            default:
+                break;
+        }
+    }
+
+    setActiveButton(buttonId) {
+        const buttons = this.root.querySelectorAll('.toolbar__action-buttons button');
+        buttons.forEach(b => b.classList.remove('active'));
+        const btn = this.root.querySelector(`#${buttonId}`);
+        btn?.classList.add('active');
+    }
+
+    uploadImage(e) {
+        const file = e?.target?.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+            fabric.Image.fromURL(evt.target.result, (img) => {
+                const cw = this.canvas.getWidth();
+                const ch = this.canvas.getHeight();
+
+                img.set({
+                    left: cw / 2,
+                    top: ch / 2,
+                    originX: 'center',
+                    originY: 'center',
+                    selectable: true,
+                    objectCaching: false
+                });
+
+                const maxW = cw * 0.9;
+                const maxH = ch * 0.9;
+                const scale = Math.min(
+                    1,
+                    maxW / (img.width || maxW),
+                    maxH / (img.height || maxH)
+                );
+                if (scale < 1) img.scale(scale);
+
+                this.canvas.add(img);
+                this.canvas.setActiveObject(img);
+                this.canvas.requestRenderAll();
+
+                this.enableMouseTool();
+                this.setActiveButton('btn-mouse');
+            }, { crossOrigin: 'anonymous' });
+        };
+        reader.readAsDataURL(file);
+
+        if (e?.target) e.target.value = '';
+    }
+
+    copySelection() {
+        const active = this.canvas.getActiveObject();
+        if (!active) return;
+        active.clone((cloned) => { this._clipboard = cloned; });
+    }
+
+    pasteSelection() {
+        if (!this._clipboard) return;
+
+        this._clipboard.clone((clonedObj) => {
+            this.canvas.discardActiveObject();
+
+            clonedObj.set({
+                left: (clonedObj.left || 0) + 20,
+                top: (clonedObj.top || 0) + 20,
+                evented: true
+            });
+
+            if (clonedObj.type === 'activeSelection') {
+                clonedObj.canvas = this.canvas;
+                clonedObj.forEachObject(obj => {
+                    obj.set({ left: obj.left + 20, top: obj.top + 20 });
+                    this.canvas.add(obj);
+                });
+                clonedObj.setCoords();
+            } else {
+                this.canvas.add(clonedObj);
+            }
+
+            this.canvas.setActiveObject(clonedObj);
+            this.canvas.requestRenderAll();
+        });
+    }
 }
