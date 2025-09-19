@@ -118,9 +118,9 @@ export class ViewerManager {
     this.slides.push(newSlide);
     await this.saveSlides();
     await this.renderSlides();
-    if (this.slides.length === 1) {
-      this.selectSlide(newSlide.id);
-    }
+
+    this.selectSlide(newSlide.id);
+
     return newSlide;
   }
 
@@ -214,13 +214,13 @@ export class ViewerManager {
     if (!slide) return null;
     this.selectedSlide = slide;
     this.updateActiveSlideUI(id);
-    this.showPreview(slide);
 
     if (this.editBtn) {
       this.editBtn.style.display = 'block';
       this.editBtn.onclick = () => this.onSlideEdit?.(slide);
     }
 
+    this.showPreview(slide);
     this.onSlideSelect?.(slide);
     return slide;
   }
@@ -242,10 +242,11 @@ export class ViewerManager {
   showEmptyPreview() {
     this.previewWrapper.innerHTML = `
       <div class="main__preview-wrapper--empty">
-        Please select or add a slide
+        This slide is empty. Click <strong>Edit</strong> to start drawing or add a background.
       </div>
     `;
-    if (this.editBtn) this.editBtn.style.display = 'none';
+
+    if (this.editBtn) this.editBtn.style.display = 'block';
   }
 
   updateActiveSlideUI(activeId) {
