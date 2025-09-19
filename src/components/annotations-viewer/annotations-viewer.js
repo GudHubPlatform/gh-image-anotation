@@ -16,6 +16,8 @@ class GhAnnotationsViewer extends HTMLElement {
 
     this.manager = null;
     this._loader = null;
+
+    this._initKey = null;
   }
 
   connectedCallback() {
@@ -38,6 +40,8 @@ class GhAnnotationsViewer extends HTMLElement {
       element_id: this.fieldId
     };
 
+    this._initKey = `gh-anno-init:${this.appId}:${this.itemId}:${this.fieldId}`;
+
     this._ensureLoader();
   }
 
@@ -53,6 +57,25 @@ class GhAnnotationsViewer extends HTMLElement {
       el
     };
     return this._loader;
+  }
+
+  async refreshSlides({ preferSlideId = null, updated = null } = {}) {
+    if (!this.manager) return;
+
+    if (updated?.id && (updated.dataUrl || updated.json)) {
+      this.manager.applyLocalUpdate(updated);
+    }
+
+    this._loader?.show();
+    try {
+      await this.manager.renderSlides();
+      if (preferSlideId) {
+        const ok = this.manager.slides?.some(s => s.id === preferSlideId);
+        if (ok) this.manager.selectSlide(preferSlideId);
+      }
+    } finally {
+      this._loader?.hide();
+    }
   }
 
   async init() {
@@ -259,7 +282,7 @@ class GhAnnotationsViewer extends HTMLElement {
           slideList,
           previewWrapper,
           editBtn,
-          onSlideSelect: (slide) => {},
+          onSlideSelect: () => {},
           onSlideEdit: (slide) => {
             this.dispatchEvent(new CustomEvent('edit', { detail: { slideId: slide.id }, bubbles: true, composed: true }));
           },
@@ -267,13 +290,22 @@ class GhAnnotationsViewer extends HTMLElement {
           loader
         });
 
+        await this.manager.renderSlides();
+
+        const wasInit = sessionStorage.getItem(this._initKey) === '1';
+        if (!wasInit && this.manager.slides?.length) {
+          this.manager.selectSlide(this.manager.slides[0].id);
+          sessionStorage.setItem(this._initKey, '1');
+        }
+
         addSlideBtn?.addEventListener('click', async () => {
           loader.show();
-          try { await this.manager.addSlide(); }
-          finally { loader.hide(); }
+          try {
+            await this.manager.addSlide();
+          } finally {
+            loader.hide();
+          }
         });
-
-        this.manager.selectSlide(this.manager?.slides?.[0]?.id);
       } catch (e) {
         console.warn(e);
       } finally {

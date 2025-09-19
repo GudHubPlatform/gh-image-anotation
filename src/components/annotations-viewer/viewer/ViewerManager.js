@@ -22,8 +22,6 @@ export class ViewerManager {
 
     this.slides = [];
     this.selectedSlide = null;
-
-    this.renderSlides();
   }
 
   async ensureSlidesLoaded() {
@@ -43,19 +41,12 @@ export class ViewerManager {
     return m ? parseInt(m[1], 10) : null;
   }
 
-  isCopyName(name = '') {
-    return /--copy\b/i.test(name);
-  }
-
-  isEmptyName(name = '') {
-    return /--empty\b/i.test(name);
-  }
+  isCopyName(name = '') { return /--copy\b/i.test(name); }
+  isEmptyName(name = '') { return /--empty\b/i.test(name); }
 
   getNextNumber() {
     const arr = Array.isArray(this.slides) ? this.slides : [];
-    const nums = arr
-      .map(s => this.parseNumber(s?.name))
-      .filter(n => Number.isInteger(n));
+    const nums = arr.map(s => this.parseNumber(s?.name)).filter(n => Number.isInteger(n));
     return nums.length ? Math.max(...nums) + 1 : 1;
   }
 
@@ -94,6 +85,19 @@ export class ViewerManager {
     return ordered;
   }
 
+  applyLocalUpdate({ id, dataUrl = null, json = null }) {
+    const idx = this.slides.findIndex(s => s.id === id);
+    if (idx === -1) return;
+
+    const slide = this.slides[idx];
+    if (dataUrl) {
+      slide.bgUrl = dataUrl;
+      slide.previewDataUrl = dataUrl;
+      slide.__previewCache = dataUrl;
+    }
+    if (json) slide.canvasJSON = json;
+  }
+
   async saveSlides() {
     this.loader?.show();
     try {
@@ -126,9 +130,6 @@ export class ViewerManager {
       this.slides.push(newSlide);
       await this.saveSlides();
       await this.renderSlides();
-
-      this.selectSlide(newSlide.id);
-
       return newSlide;
     } finally {
       this.loader?.hide();
@@ -142,13 +143,7 @@ export class ViewerManager {
       this.slides = this.slides.filter(slide => slide.id !== id);
       await this.saveSlides();
       await this.renderSlides();
-      if (this.selectedSlide?.id === id) {
-        if (this.slides.length > 0) {
-          this.selectSlide(this.slides[0].id);
-        } else {
-          this.showEmptyPreview();
-        }
-      }
+      if (!this.slides.length) this.showEmptyPreview();
     } finally {
       this.loader?.hide();
     }
@@ -240,12 +235,10 @@ export class ViewerManager {
     if (!slide) return null;
     this.selectedSlide = slide;
     this.updateActiveSlideUI(id);
-
     if (this.editBtn) {
       this.editBtn.style.display = 'block';
       this.editBtn.onclick = () => this.onSlideEdit?.(slide);
     }
-
     this.showPreview(slide);
     this.onSlideSelect?.(slide);
     return slide;
@@ -269,7 +262,6 @@ export class ViewerManager {
         This slide is empty. Click "Edit" to start drawing or add a background.
       </div>
     `;
-
     if (this.editBtn) this.editBtn.style.display = 'block';
   }
 

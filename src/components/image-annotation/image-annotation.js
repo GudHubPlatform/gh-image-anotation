@@ -87,7 +87,7 @@ class GhImageAnnotation extends GhHtmlElement {
         const newType = prev?.type === 'copy' ? 'copy' : 'normal';
         const newName = newType === 'copy' ? `slide-${n}--copy` : `slide-${n}`;
 
-        slides[currentSlideIndex] = {
+        const updatedSlide = {
           id: prev?.id || `slide-${Date.now()}`,
           name: newName,
           bgUrl: dataUrl,
@@ -96,6 +96,12 @@ class GhImageAnnotation extends GhHtmlElement {
           canvasJSON: json
         };
 
+        viewer?.refreshSlides?.({
+          preferSlideId: updatedSlide.id,
+          updated: { id: updatedSlide.id, dataUrl, json }
+        });
+
+        slides[currentSlideIndex] = updatedSlide;
         await slidesServiceDM.createDataWithSlides(this.documentAddress, slides);
       }
 
