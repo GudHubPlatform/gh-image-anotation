@@ -47,14 +47,23 @@ class GhAnnotationsViewer extends HTMLElement {
 
   _ensureLoader() {
     if (this._loader) return this._loader;
+
     const el = document.createElement('div');
     el.className = 'gh-loader-overlay';
     el.innerHTML = `<div class="gh-loader-overlay__spinner" role="status" aria-label="Loading"></div>`;
     this.appendChild(el);
+
+    let refCount = 0;
+    const apply = () => {
+      if (refCount > 0) el.classList.add('gh-loader-overlay--active');
+      else el.classList.remove('gh-loader-overlay--active');
+    };
+
     this._loader = {
-      show: () => el.classList.add('gh-loader-overlay--active'),
-      hide: () => el.classList.remove('gh-loader-overlay--active'),
-      el
+      el,
+      show: () => { refCount++; apply(); },
+      hide: () => { refCount = Math.max(0, refCount - 1); apply(); },
+      reset: () => { refCount = 0; apply(); }
     };
     return this._loader;
   }
@@ -63,7 +72,7 @@ class GhAnnotationsViewer extends HTMLElement {
     if (!this.manager) return;
 
     if (updated?.id && (updated.dataUrl || updated.json)) {
-      this.manager.applyLocalUpdate(updated);
+      this.manager.applyLocalUpdate?.(updated);
     }
 
     this._loader?.show();
