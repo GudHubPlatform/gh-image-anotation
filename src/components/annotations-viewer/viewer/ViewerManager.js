@@ -59,7 +59,7 @@ export class ViewerManager {
   }
 
   normalizeSlide(s, idx = 0) {
-    const allowed = ['id', 'name', 'bgUrl', 'previewDataUrl', 'type', 'fileId'];
+    const allowed = ['id', 'name', 'bgUrl', 'previewDataUrl', 'type', 'fileId', 'canvasJSON'];
 
     let id = s?.id || this.genId();
     let name = s?.name || '';
@@ -84,7 +84,8 @@ export class ViewerManager {
       bgUrl: s?.bgUrl || null,
       previewDataUrl: s?.previewDataUrl || null,
       type,
-      fileId: s?.fileId ?? null
+      fileId: s?.fileId ?? null,
+      canvasJSON: s?.canvasJSON ?? null
     };
 
     const ordered = {};
@@ -106,7 +107,8 @@ export class ViewerManager {
       bgUrl: null,
       previewDataUrl: null,
       type: 'empty',
-      fileId: null
+      fileId: null,
+      canvasJSON: null
     };
   }
 
@@ -150,7 +152,8 @@ export class ViewerManager {
       type: 'copy',
       bgUrl: original?.bgUrl || null,
       previewDataUrl: original?.previewDataUrl || null,
-      fileId: original?.fileId ?? null
+      fileId: original?.fileId ?? null,
+      canvasJSON: original?.canvasJSON ?? null
     });
 
     this.slides.splice(originalIndex + 1, 0, copy);
@@ -221,14 +224,14 @@ export class ViewerManager {
         onDuplicate: () => this.duplicateSlide(slide.id),
         onSelect: () => this.selectSlide(slide.id)
       });
-      slideEl.dataset.id = slide.id;
       this.slideList.appendChild(slideEl);
     });
 
-    if (!this.selectedSlide && this.slides.length > 0) {
-      this.selectSlide(this.slides[0].id);
-    } else if (this.slides.length === 0) {
+    if (this.slides.length === 0) {
       this.showEmptyPreview();
+      if (this.editBtn) this.editBtn.style.display = 'none';
+    } else if (!this.selectedSlide) {
+      this.selectSlide(this.slides[0].id);
     }
   }
 }

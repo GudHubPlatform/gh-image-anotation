@@ -81,7 +81,8 @@ class GhImageAnnotation extends GhHtmlElement {
           bgUrl: dataUrl,
           previewDataUrl: dataUrl,
           type: newType,
-          fileId: prev?.fileId ?? null
+          fileId: prev?.fileId ?? null,
+          canvasJSON: json
         };
 
         await slidesServiceDM.createDataWithSlides(this.documentAddress, slides);
