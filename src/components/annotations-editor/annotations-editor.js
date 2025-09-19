@@ -65,7 +65,7 @@ class GhAnnotationsEditor extends HTMLElement {
       .gh-page-loader {
         position: fixed; inset: 0;
         display: none; place-items: center;
-        background: rgba(0,0,0,0.15);
+        background: rgba(0,0,0,0.3);
         z-index: 1000;
       }
       .gh-page-loader--active { display: grid; }

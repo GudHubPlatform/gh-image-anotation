@@ -41,6 +41,16 @@ export default class PaintEditor {
 
     init() {
         this._onKeyDown = (e) => {
+            const t = e.target;
+            const tag = (t?.tagName || '').toLowerCase();
+            const isEditable =
+              t?.isContentEditable ||
+              tag === 'input' ||
+              tag === 'textarea' ||
+              tag === 'select' ||
+              (typeof t?.closest === 'function' && !!t.closest('.gh-link-toolbar, .link-toolbar, [role="textbox"]'));
+            if (isEditable) return;
+
             const platform = navigator.userAgentData?.platform || navigator.platform || '';
             const isMac = /mac/i.test(platform);
             const mod = isMac ? e.metaKey : e.ctrlKey;
