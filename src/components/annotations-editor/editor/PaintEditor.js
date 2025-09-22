@@ -41,6 +41,16 @@ export default class PaintEditor {
 
     init() {
         this._onKeyDown = (e) => {
+            const t = e.target;
+            const tag = (t?.tagName || '').toLowerCase();
+            const isEditable =
+              t?.isContentEditable ||
+              tag === 'input' ||
+              tag === 'textarea' ||
+              tag === 'select' ||
+              (typeof t?.closest === 'function' && !!t.closest('.gh-link-toolbar, .link-toolbar, [role="textbox"]'));
+            if (isEditable) return;
+
             const platform = navigator.userAgentData?.platform || navigator.platform || '';
             const isMac = /mac/i.test(platform);
             const mod = isMac ? e.metaKey : e.ctrlKey;
@@ -129,14 +139,25 @@ export default class PaintEditor {
             if (this.restoreDepth > 0) return;
             this.saveState();
         });
+
         this.canvas.on('object:removed', () => {
             if (this.restoreDepth > 0) return;
             this.saveState();
         });
-        this.canvas.on('path:created', () => {
+
+        this.canvas.on('path:created', (e) => {
+            const path = e?.path || e?.target;
+            if (path) {
+                path.set({
+                    fill: null,
+                    stroke: this.currentColor,
+                    strokeUniform: true
+                });
+            }
             if (this.restoreDepth > 0) return;
             this.saveState();
         });
+
         this.canvas.on('object:added', (e) => {
             if (this.restoreDepth > 0) return;
             if (e?.target?.type === 'path') return;
