@@ -27,15 +27,15 @@ gh-annotations-viewer {
     &__add-button {
       width: 100%;
       height: 150px;
-      color: white;
-      background: white;
+      color: transparent;
+      background: rgb(207, 207, 207);
       padding: 8px 12px;
       border: none;
       cursor: pointer;
       border-radius: 3px;
       margin-top: 12px;
       font-weight: bold;
-      transition: all 0.2s;
+      transition: all 0.3s;
 
       &:hover {
         transform: scale(1.02);
