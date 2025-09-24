@@ -18,11 +18,23 @@ class GhAnnotationsViewer extends HTMLElement {
     this._loader = null;
 
     this._initKey = null;
+
+    this._ghValueUpdateHandler = null;
   }
 
   connectedCallback() {
     this.render();
     this.init();
+
+    this._subscribeToGudhubFieldUpdates();
+  }
+
+  disconnectedCallback() {
+    try {
+      this._unsubscribeFromGudhubFieldUpdates();
+    } catch (e) {
+      console.warn('Failed to destroy gh_value_update listener', e);
+    }
   }
 
   render() {
@@ -321,6 +333,39 @@ class GhAnnotationsViewer extends HTMLElement {
         loader.hide();
       }
     }
+  }
+
+  _subscribeToGudhubFieldUpdates() {
+    if (this._ghValueUpdateHandler) return;
+
+    const filter = {
+      app_id: this.appId,
+      item_id: this.itemId,
+      field_id: this.fieldId,
+    };
+
+    this._ghValueUpdateHandler = async (_event) => {
+      try {
+        await this.init();
+      } catch (e) {
+        console.warn('Slides reload on gh_value_update failed', e);
+      }
+    };
+
+    gudhub.on('gh_value_update', filter, this._ghValueUpdateHandler);
+  }
+
+  _unsubscribeFromGudhubFieldUpdates() {
+    if (!this._ghValueUpdateHandler) return;
+
+    const filter = {
+      app_id: this.appId,
+      item_id: this.itemId,
+      field_id: this.fieldId,
+    };
+
+    gudhub.destroy('gh_value_update', filter, this._ghValueUpdateHandler);
+    this._ghValueUpdateHandler = null;
   }
 }
 
