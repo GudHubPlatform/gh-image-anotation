@@ -7,7 +7,7 @@ class SlidesServiceDM {
 
   _stripTransient(slides) {
     if (!Array.isArray(slides)) return slides;
-    return slides.map(({ previewDataUrl, bgUrl, ...rest }) => rest);
+    return slides.map(({ previewDataUrl, bgUrl, __previewCache, ...rest }) => rest);
   }
 
   async getDataWithSlides(documentAddress) {
