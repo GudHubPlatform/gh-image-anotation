@@ -209,6 +209,7 @@ class GhAnnotationsEditor extends HTMLElement {
         this.editor.isRestoring = true;
         this.editor.canvas.loadFromJSON(slide.canvasJSON, () => {
           this._sanitizeCanvasPaths();
+          this.editor.rebuildTextHelpers?.();
           this.editor.canvas.renderAll();
           this.editor.isRestoring = false;
           finishInitial();
