@@ -219,7 +219,8 @@ export default class PaintEditor {
                 if (obj.type === 'polygon') obj.set({ fill: color });
             });
         } else if (activeObject.type === 'textbox') {
-            activeObject.set({ fill: color, cursorColor: color });
+            // activeObject.set({ fill: color, cursorColor: color });
+            return;
         } else if (activeObject.type === 'line' || activeObject.type === 'path') {
             activeObject.set({ stroke: color });
         } else if (activeObject.type === 'rect' || activeObject.type === 'circle' || activeObject.type === 'triangle') {
