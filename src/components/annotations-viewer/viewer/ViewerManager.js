@@ -192,6 +192,23 @@ export class ViewerManager {
             if (obj.type === 'path') obj.set({ fill: null });
           });
 
+          canvas.getObjects().forEach(obj => {
+            if (obj.type === 'textbox') {
+              const c = obj.aCoords; if (!c) return;
+              const left = Math.min(c.tl.x, c.tr.x, c.bl.x, c.br.x);
+              const top = Math.min(c.tl.y, c.tr.y, c.bl.y, c.br.y);
+              const right = Math.max(c.tl.x, c.tr.x, c.bl.x, c.br.x);
+              const bottom = Math.max(c.tl.y, c.tr.y, c.bl.y, c.br.y);
+              const border = new fabric.Rect({
+                left, top, width: right - left, height: bottom - top,
+                stroke: '#FF0000', strokeWidth: 2, fill: 'rgba(0,0,0,0)',
+                selectable: false, evented: false
+              });
+              canvas.add(border);
+              canvas.bringToFront(border);
+            }
+          });
+
           canvas.renderAll();
           const dataUrl = canvas.toDataURL({
             format: 'png',
