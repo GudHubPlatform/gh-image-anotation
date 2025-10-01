@@ -65,6 +65,11 @@ export function applyFabricOverrides() {
   const originalTextboxInitialize = fabric.Textbox.prototype.initialize;
   fabric.Textbox.prototype.initialize = function (...args) {
     originalTextboxInitialize.call(this, ...args);
+    this.set({
+      fontFamily: 'Arial, sans-serif',
+      fontSize: 16
+    });
+
     this.controls = {
       ...fabric.Object.prototype.controls,
       deleteControl: fabric.Object.prototype.controls.deleteControl
