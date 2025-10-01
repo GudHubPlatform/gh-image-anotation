@@ -29,6 +29,7 @@ export class ViewerManager {
       this.slides = await this.loadSlides();
     }
     if (!Array.isArray(this.slides)) this.slides = [];
+    this.slides = this._dedupeById(this.slides);
   }
 
   genId() {
@@ -102,6 +103,7 @@ export class ViewerManager {
     this.loader?.show();
     try {
       await this.ensureSlidesLoaded();
+      this.slides = this._dedupeById(this.slides);
       const minimal = this.slides.map((s, i) => this.normalizeSlide(s, i));
       await slidesServiceDM.createDataWithSlides(this.documentAddress, minimal);
     } finally {
@@ -179,6 +181,18 @@ export class ViewerManager {
     }
   }
 
+  _dedupeById(arr = []) {
+    const seen = new Set();
+    const out = [];
+    for (const s of arr) {
+      const id = s?.id;
+      if (!id || seen.has(id)) continue;
+      seen.add(id);
+      out.push(s);
+    }
+    return out;
+  }
+
   async _generatePreviewFromCanvasJSON(canvasJSON) {
     return new Promise((resolve, reject) => {
       try {
@@ -186,10 +200,33 @@ export class ViewerManager {
         el.width = 1920;
         el.height = 1080;
         const canvas = new fabric.Canvas(el, { selection: false });
-
         canvas.loadFromJSON(canvasJSON, () => {
           canvas.getObjects().forEach(obj => {
             if (obj.type === 'path') obj.set({ fill: null });
+          });
+
+          canvas.getObjects().forEach(obj => {
+            if (obj.type === 'textbox') {
+              const c = obj.aCoords;
+              if (!c) return;
+              const left = Math.min(c.tl.x, c.tr.x, c.bl.x, c.br.x);
+              const top = Math.min(c.tl.y, c.tr.y, c.bl.y, c.br.y);
+              const right = Math.max(c.tl.x, c.tr.x, c.bl.x, c.br.x);
+              const bottom = Math.max(c.tl.y, c.tr.y, c.bl.y, c.br.y);
+              const border = new fabric.Rect({
+                left,
+                top,
+                width: right - left,
+                height: bottom - top,
+                stroke: '#FF0000',
+                strokeWidth: 2,
+                fill: 'rgba(0,0,0,0)',
+                selectable: false,
+                evented: false
+              });
+              canvas.add(border);
+              canvas.bringToFront(border);
+            }
           });
 
           canvas.renderAll();
