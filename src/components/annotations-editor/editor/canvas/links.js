@@ -133,11 +133,48 @@ export function setupLinkTools(editor) {
                 });
                 textbox.customUrl = linkUrl;
 
-                if (!textbox.__dblBound) {
-                    textbox.on('mousedblclick', () => {
-                        if (textbox.customUrl) window.open(textbox.customUrl, '_blank');
+                if (!textbox.__linkBindings) {
+                    const CLICK_EPS2 = 9;
+
+                    textbox.on('mousedown', (opt) => {
+                        const p = opt?.pointer || textbox.canvas?.getPointer(opt?.e);
+                        textbox.__downPos = p ? { x: p.x, y: p.y } : null;
                     });
-                    textbox.__dblBound = true;
+
+                    textbox.on('mouseup', (opt) => {
+                        const evt = opt?.e;
+                        const isLeft = evt?.button === 0 || evt?.which === 1;
+                        if (!isLeft) return;
+
+                        const withModifier = !!(evt && (evt.ctrlKey || evt.metaKey));
+                        const p = opt?.pointer || textbox.canvas?.getPointer(evt);
+
+                        const dx = (p?.x ?? 0) - (textbox.__downPos?.x ?? 0);
+                        const dy = (p?.y ?? 0) - (textbox.__downPos?.y ?? 0);
+                        const isClick = (dx*dx + dy*dy) <= CLICK_EPS2;
+
+                        if (withModifier && isClick && textbox.customUrl) {
+                            evt.preventDefault?.();
+                            evt.stopPropagation?.();
+                            window.open(textbox.customUrl, '_blank');
+                            return;
+                        }
+                    });
+
+                    textbox.on('mousedblclick', (opt) => {
+                        const evt = opt?.e;
+                        const withModifier = !!(evt && (evt.ctrlKey || evt.metaKey));
+                        if (withModifier) return;
+
+                        const canvas = textbox.canvas;
+                        canvas?.setActiveObject(textbox);
+                        if (!textbox.isEditing) {
+                            textbox.enterEditing();
+                            canvas?.requestRenderAll();
+                        }
+                    });
+
+                    textbox.__linkBindings = true;
                 }
 
                 editor.canvas.requestRenderAll();
