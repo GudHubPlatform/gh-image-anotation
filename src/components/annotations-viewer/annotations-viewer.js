@@ -313,12 +313,6 @@ class GhAnnotationsViewer extends HTMLElement {
 
         await this.manager.renderSlides();
 
-        const wasInit = sessionStorage.getItem(this._initKey) === '1';
-        if (!wasInit && this.manager.slides?.length) {
-          this.manager.selectSlide(this.manager.slides[0].id);
-          sessionStorage.setItem(this._initKey, '1');
-        }
-
         addSlideBtn?.addEventListener('click', async () => {
           loader.show();
           try {

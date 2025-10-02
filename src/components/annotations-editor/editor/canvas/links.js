@@ -132,51 +132,7 @@ export function setupLinkTools(editor) {
                     cursorColor: '#0000EE'
                 });
                 textbox.customUrl = linkUrl;
-
-                if (!textbox.__linkBindings) {
-                    const CLICK_EPS2 = 9;
-
-                    textbox.on('mousedown', (opt) => {
-                        const p = opt?.pointer || textbox.canvas?.getPointer(opt?.e);
-                        textbox.__downPos = p ? { x: p.x, y: p.y } : null;
-                    });
-
-                    textbox.on('mouseup', (opt) => {
-                        const evt = opt?.e;
-                        const isLeft = evt?.button === 0 || evt?.which === 1;
-                        if (!isLeft) return;
-
-                        const withModifier = !!(evt && (evt.ctrlKey || evt.metaKey));
-                        const p = opt?.pointer || textbox.canvas?.getPointer(evt);
-
-                        const dx = (p?.x ?? 0) - (textbox.__downPos?.x ?? 0);
-                        const dy = (p?.y ?? 0) - (textbox.__downPos?.y ?? 0);
-                        const isClick = (dx*dx + dy*dy) <= CLICK_EPS2;
-
-                        if (withModifier && isClick && textbox.customUrl) {
-                            evt.preventDefault?.();
-                            evt.stopPropagation?.();
-                            window.open(textbox.customUrl, '_blank');
-                            return;
-                        }
-                    });
-
-                    textbox.on('mousedblclick', (opt) => {
-                        const evt = opt?.e;
-                        const withModifier = !!(evt && (evt.ctrlKey || evt.metaKey));
-                        if (withModifier) return;
-
-                        const canvas = textbox.canvas;
-                        canvas?.setActiveObject(textbox);
-                        if (!textbox.isEditing) {
-                            textbox.enterEditing();
-                            canvas?.requestRenderAll();
-                        }
-                    });
-
-                    textbox.__linkBindings = true;
-                }
-
+                bindLinkInteractions(textbox);
                 editor.canvas.requestRenderAll();
                 editor.saveState?.();
             }
@@ -267,8 +223,61 @@ export function setupLinkTools(editor) {
         editor.hideLinkToolbar();
     });
 
+    const CLICK_EPS = 3;
+
+    const bindLinkInteractions = (textbox) => {
+        if (!isLinkTextbox(textbox)) return;
+        if (textbox.__linkBindings) return;
+        textbox.__linkBindings = true;
+
+        let down = null;
+
+        textbox.on('editing:entered', () => {
+            const el = textbox.hiddenTextarea;
+            if (el) {
+                if (!el.id) el.id = 'fabric-hidden-textarea';
+                if (!el.name) el.name = 'fabric-hidden-textarea';
+            }
+        });
+
+        textbox.on('mousedown', (opt) => {
+            const p = opt?.pointer || textbox.canvas?.getPointer(opt?.e);
+            down = p ? { x: p.x, y: p.y } : null;
+        });
+
+        textbox.on('mouseup', (opt) => {
+            const evt = opt?.e;
+            const isLeft = evt?.button === 0 || evt?.which === 1;
+            if (!isLeft) return;
+
+            const withModifier = !!(evt && (evt.ctrlKey || evt.metaKey));
+            const p = opt?.pointer || textbox.canvas?.getPointer(evt);
+            const dx = (p?.x ?? 0) - (down?.x ?? 0);
+            const dy = (p?.y ?? 0) - (down?.y ?? 0);
+            const isClick = (dx*dx + dy*dy) <= (CLICK_EPS * CLICK_EPS);
+
+            if (withModifier && isClick && textbox.customUrl) {
+                evt.preventDefault?.();
+                evt.stopPropagation?.();
+                window.open(textbox.customUrl, '_blank');
+            }
+        });
+
+        textbox.on('mousedblclick', (opt) => {
+            const evt = opt?.e;
+            if (evt?.ctrlKey || evt?.metaKey) return;
+            const canvas = textbox.canvas;
+            canvas?.setActiveObject(textbox);
+            if (!textbox.isEditing) {
+                textbox.enterEditing();
+                canvas?.requestRenderAll();
+            }
+        });
+    };
+
     const bindLinkObject = (tb) => {
         if (!isLinkTextbox(tb)) return;
+        bindLinkInteractions(tb);
         tb.on('mouseup', () => {
             setTimeout(() => {
                 if (editor.canvas.getActiveObject() === tb) {
@@ -291,6 +300,13 @@ export function setupLinkTools(editor) {
         args.forEach(bindLinkObject);
         return res;
     };
+
+    editor.canvas.on('object:added', (e) => {
+        const o = e?.target;
+        if (o && o.type === 'textbox' && Object.prototype.hasOwnProperty.call(o, 'customUrl')) {
+            bindLinkObject(o);
+        }
+    });
 
     editor.canvas.on('object:moving', (e) => {
         if (e.target && e.target === editor.activeLinkTextbox) schedulePosition();

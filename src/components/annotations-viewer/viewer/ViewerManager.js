@@ -207,6 +207,8 @@ export class ViewerManager {
 
           canvas.getObjects().forEach(obj => {
             if (obj.type === 'textbox') {
+              if (Object.prototype.hasOwnProperty.call(obj, 'customUrl')) return;
+
               const c = obj.aCoords;
               if (!c) return;
               const left = Math.min(c.tl.x, c.tr.x, c.bl.x, c.br.x);
@@ -326,6 +328,10 @@ export class ViewerManager {
         onSelect: () => this.selectSlide(slide.id)
       });
       this.slideList.appendChild(item);
+    }
+
+    if (this.slides.length && (!this.selectedSlide || !this.slides.some(s => s.id === this.selectedSlide.id))) {
+      this.selectSlide(this.slides[0].id);
     }
   }
 }
