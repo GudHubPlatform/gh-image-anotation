@@ -11,6 +11,7 @@ export function setupTextTools(editor) {
 
         const textboxes = editor.canvas.getObjects().filter(o => o.type === 'textbox');
         textboxes.forEach(tb => {
+            if (tb.customUrl) return;
             if (tb.borderRect && tb.borderRect.__isTextBorder) return;
 
             const rect = new fabric.Rect({
@@ -149,9 +150,13 @@ export function setupTextTools(editor) {
             textbox.on('rotating', () => rect.set({ angle: textbox.angle }));
             textbox.on('changed', syncRect);
             textbox.on('modified', syncRect);
-
             textbox.on('editing:entered', () => {
                 editor.isTypingText = true;
+                const el = textbox.hiddenTextarea;
+                if (el) {
+                    if (!el.id) el.id = 'fabric-hidden-textarea';
+                    if (!el.name) el.name = 'fabric-hidden-textarea';
+                }
             });
 
             textbox.on('editing:exited', () => {

@@ -207,6 +207,8 @@ export class ViewerManager {
 
           canvas.getObjects().forEach(obj => {
             if (obj.type === 'textbox') {
+              if (Object.prototype.hasOwnProperty.call(obj, 'customUrl')) return;
+
               const c = obj.aCoords;
               if (!c) return;
               const left = Math.min(c.tl.x, c.tr.x, c.bl.x, c.br.x);
@@ -288,6 +290,8 @@ export class ViewerManager {
       const img = document.createElement('img');
       img.src = src;
       this.previewWrapper.appendChild(img);
+
+      attachMainPreviewHotspots(this.previewWrapper, img, slide);
     } else {
       this.showEmptyPreview();
     }
@@ -327,5 +331,76 @@ export class ViewerManager {
       });
       this.slideList.appendChild(item);
     }
+
+    if (this.slides.length && (!this.selectedSlide || !this.slides.some(s => s.id === this.selectedSlide.id))) {
+      this.selectSlide(this.slides[0].id);
+    }
   }
+}
+
+function attachMainPreviewHotspots(container, img, slide) {
+  const json = slide?.canvasJSON;
+  const objs = json?.objects || [];
+  const links = objs.filter(o => o && o.type === 'textbox' && o.customUrl);
+  if (!links.length) return;
+
+  if (getComputedStyle(container).position === 'static') {
+    container.style.position = 'relative';
+  }
+
+  const baseW = json?.width || img.naturalWidth || 1920;
+  const baseH = json?.height || img.naturalHeight || 1080;
+
+  const place = () => {
+    container.querySelectorAll('.__link-hotspot').forEach(n => n.remove());
+
+    const cRect = container.getBoundingClientRect();
+    const iRect = img.getBoundingClientRect();
+
+    const offsetLeft = iRect.left - cRect.left;
+    const offsetTop  = iRect.top  - cRect.top;
+
+    const scaleX = iRect.width  / baseW;
+    const scaleY = iRect.height / baseH;
+
+    links.forEach(tb => {
+      const sx = tb.scaleX || 1;
+      const sy = tb.scaleY || 1;
+      const w = (tb.width  || 0) * sx;
+      const h = (tb.height || 0) * sy;
+
+      let left = tb.left || 0;
+      let top  = tb.top  || 0;
+
+      const ox = tb.originX || 'center';
+      const oy = tb.originY || 'center';
+      if (ox === 'center') left -= w / 2; else if (ox === 'right') left -= w;
+      if (oy === 'center') top  -= h / 2; else if (oy === 'bottom') top  -= h;
+
+      const a = document.createElement('a');
+      a.className = '__link-hotspot';
+      a.href = tb.customUrl;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      a.style.position = 'absolute';
+      a.style.left   = `${Math.round(offsetLeft + left * scaleX)}px`;
+      a.style.top    = `${Math.round(offsetTop  + top  * scaleY)}px`;
+      a.style.width  = `${Math.round(w * scaleX)}px`;
+      a.style.height = `${Math.round(h * scaleY)}px`;
+      a.style.display = 'block';
+      a.style.background = 'transparent';
+      a.style.cursor = 'pointer';
+      a.style.pointerEvents = 'auto';
+      a.style.zIndex = '3';
+      a.addEventListener('click', (e) => e.stopPropagation());
+
+      container.appendChild(a);
+    });
+  };
+
+  if (img.complete) requestAnimationFrame(place);
+  else img.addEventListener('load', place, { once: true });
+
+  const ro = new ResizeObserver(() => place());
+  ro.observe(img);
 }

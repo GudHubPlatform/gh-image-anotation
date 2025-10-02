@@ -62,6 +62,15 @@ export function applyFabricOverrides() {
     }
   });
 
+  const originalToObject = fabric.Object.prototype.toObject;
+  fabric.Object.prototype.toObject = function (propertiesToInclude) {
+    const extra = ['customUrl'];
+    const props = Array.isArray(propertiesToInclude)
+      ? propertiesToInclude.concat(extra)
+      : extra;
+    return originalToObject.call(this, props);
+  };
+
   const originalTextboxInitialize = fabric.Textbox.prototype.initialize;
   fabric.Textbox.prototype.initialize = function (...args) {
     originalTextboxInitialize.call(this, ...args);
