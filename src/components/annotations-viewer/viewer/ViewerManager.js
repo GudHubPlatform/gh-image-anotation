@@ -2,7 +2,7 @@ import { renderPreview } from './ViewerPreview.js';
 import { slidesServiceDM } from '../../../services/slidesServiceDM.js';
 
 export class ViewerManager {
-  constructor(appId, fieldId, itemId, { slideList, previewWrapper, editBtn, onSlideSelect, onSlideEdit, storageKey, loader = null }) {
+  constructor(appId, fieldId, itemId, { slideList, previewWrapper, editBtn, onSlideSelect, onSlideEdit, loader = null, readOnly = false }) {
     this.appId = appId;
     this.fieldId = fieldId;
     this.itemId = itemId;
@@ -17,8 +17,8 @@ export class ViewerManager {
     this.editBtn = editBtn;
     this.onSlideSelect = onSlideSelect;
     this.onSlideEdit = onSlideEdit;
-    this.storageKey = storageKey || 'slides';
     this.loader = loader;
+    this.readOnly = readOnly;
 
     this.slides = [];
     this.selectedSlide = null;
@@ -275,8 +275,13 @@ export class ViewerManager {
     this.selectedSlide = slide;
     this.updateActiveSlideUI(id);
     if (this.editBtn) {
-      this.editBtn.style.display = 'block';
-      this.editBtn.onclick = () => this.onSlideEdit?.(slide);
+      if (this.readOnly) {
+        this.editBtn.style.display = 'none';
+        this.editBtn.onclick = null;
+      } else {
+        this.editBtn.style.display = 'block';
+        this.editBtn.onclick = () => this.onSlideEdit?.(slide);
+      }
     }
     this.showPreview(slide);
     this.onSlideSelect?.(slide);
@@ -327,7 +332,8 @@ export class ViewerManager {
       const item = renderPreview(slide, {
         onDelete: () => this.deleteSlide(slide.id),
         onDuplicate: () => this.duplicateSlide(slide.id),
-        onSelect: () => this.selectSlide(slide.id)
+        onSelect: () => this.selectSlide(slide.id),
+        readOnly: this.readOnly
       });
       this.slideList.appendChild(item);
     }

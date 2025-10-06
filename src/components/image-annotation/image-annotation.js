@@ -11,6 +11,8 @@ class GhImageAnnotation extends GhHtmlElement {
   constructor() {
     super();
 
+    this.isEditable = false;
+
     this.appId = null;
     this.fieldId = null;
     this.itemId = null;
@@ -18,6 +20,8 @@ class GhImageAnnotation extends GhHtmlElement {
   }
 
   onInit() {
+    this.isEditable = this.scope?.field_model?.settings?.editable == 0;
+
     super.render(`
       <style>${styles}</style>
       ${html}
@@ -51,7 +55,6 @@ class GhImageAnnotation extends GhHtmlElement {
     editorWrapper.innerHTML = '';
     const editorEl = document.createElement('gh-annotations-editor');
     editorEl.setAttribute('slide-id', slideId);
-    editorEl.setAttribute('storage-key', 'slides');
 
     editorEl.setAttribute('data-app-id', this.appId);
     editorEl.setAttribute('data-item-id', this.itemId);

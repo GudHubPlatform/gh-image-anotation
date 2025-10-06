@@ -187,7 +187,6 @@ class GhAnnotationsEditor extends HTMLElement {
 
   async init() {
     const slideId = this.getAttribute('slide-id');
-    const storageKey = this.getAttribute('storage-key') || 'slides';
 
     this._showPageLoader();
 
