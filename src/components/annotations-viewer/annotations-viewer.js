@@ -46,11 +46,9 @@ class GhAnnotationsViewer extends HTMLElement {
     this.appId = this.getAttribute('data-app-id') || '';
     this.itemId = this.getAttribute('data-item-id') || '';
     this.fieldId = this.getAttribute('data-field-id') || '';
-    this.documentAddress = {
-      app_id: this.appId,
-      item_id: this.itemId,
-      element_id: this.fieldId
-    };
+    this.documentAddress = (this.appId && this.itemId && this.fieldId)
+      ? { app_id: this.appId, item_id: this.itemId, element_id: this.fieldId }
+      : null;
 
     this._initKey = `gh-anno-init:${this.appId}:${this.itemId}:${this.fieldId}`;
 
@@ -302,7 +300,7 @@ class GhAnnotationsViewer extends HTMLElement {
         }
 
         const changed = filtered.length !== slides.length || toAdd.length > 0;
-        if (changed) {
+        if (changed && this.documentAddress) {
           await slidesServiceDM.createDataWithSlides(this.documentAddress, filtered);
         }
 
