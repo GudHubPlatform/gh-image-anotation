@@ -46,11 +46,9 @@ class GhAnnotationsViewer extends HTMLElement {
     this.appId = this.getAttribute('data-app-id') || '';
     this.itemId = this.getAttribute('data-item-id') || '';
     this.fieldId = this.getAttribute('data-field-id') || '';
-    this.documentAddress = {
-      app_id: this.appId,
-      item_id: this.itemId,
-      element_id: this.fieldId
-    };
+    this.documentAddress = (this.appId && this.itemId && this.fieldId)
+      ? { app_id: this.appId, item_id: this.itemId, element_id: this.fieldId }
+      : null;
 
     this._initKey = `gh-anno-init:${this.appId}:${this.itemId}:${this.fieldId}`;
 
@@ -105,7 +103,14 @@ class GhAnnotationsViewer extends HTMLElement {
     const addSlideBtn = this.querySelector('#addSlideBtn');
     const editBtn = this.querySelector('#editBtn');
 
-    const storageKey = this.getAttribute('storage-key') || 'slides';
+    const readOnly = JSON.parse(this.getAttribute("data-is-editable"));
+    if (readOnly) {
+      editBtn?.classList.add('hidden');
+      addSlideBtn?.setAttribute('disabled', 'true');
+      addSlideBtn?.setAttribute('aria-disabled', 'true');
+      addSlideBtn?.classList.add('hidden');
+    }
+
     const loader = this._ensureLoader();
 
     const validateImage = (url, timeoutMs = 5000) => {
@@ -295,7 +300,7 @@ class GhAnnotationsViewer extends HTMLElement {
         }
 
         const changed = filtered.length !== slides.length || toAdd.length > 0;
-        if (changed) {
+        if (changed && this.documentAddress) {
           await slidesServiceDM.createDataWithSlides(this.documentAddress, filtered);
         }
 
@@ -307,13 +312,14 @@ class GhAnnotationsViewer extends HTMLElement {
           onSlideEdit: (slide) => {
             this.dispatchEvent(new CustomEvent('edit', { detail: { slideId: slide.id }, bubbles: true, composed: true }));
           },
-          storageKey,
-          loader
+          loader,
+          readOnly
         });
 
         await this.manager.renderSlides();
 
         addSlideBtn?.addEventListener('click', async () => {
+          if (readOnly) return;
           loader.show();
           try {
             await this.manager.addSlide();

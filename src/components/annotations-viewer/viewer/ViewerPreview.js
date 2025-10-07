@@ -1,4 +1,4 @@
-export function renderPreview(slide, { onDelete, onDuplicate, onSelect }) {
+export function renderPreview(slide, { onDelete, onDuplicate, onSelect, readOnly = false }) {
   const container = document.createElement('div');
   container.className = 'sidebar__slide-preview-container';
   container.dataset.id = slide.id;
@@ -50,9 +50,10 @@ export function renderPreview(slide, { onDelete, onDuplicate, onSelect }) {
   });
   btnWrapper.appendChild(duplicateBtn);
 
-  container.appendChild(btnWrapper);
-
   container.addEventListener('click', () => onSelect?.());
+  if (!readOnly) {
+    container.appendChild(btnWrapper);
+  }
 
   return container;
 }

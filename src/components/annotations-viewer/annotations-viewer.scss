@@ -28,7 +28,7 @@ gh-annotations-viewer {
       width: 100%;
       height: 150px;
       color: transparent;
-      background: rgb(207, 207, 207);
+      background: rgba(207, 207, 207, 0.212);
       padding: 8px 12px;
       border: none;
       cursor: pointer;
@@ -72,6 +72,11 @@ gh-annotations-viewer {
         height: auto;
         border-radius: 2px;
       }
+    }
+
+    &__slide-preview-container.active {
+      border: 4px solid #DE2F2F;
+      border-radius: 4px;
     }
 
     &__slide-actions {
